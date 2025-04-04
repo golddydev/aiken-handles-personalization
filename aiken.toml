@@ -1,0 +1,26 @@
+name = "koralabs/aiken-handles-personalization"
+version = "0.0.0"
+compiler = "v1.0.29-alpha"
+plutus = "v2"
+license = "Apache-2.0"
+description = "Aiken contracts for project 'koralabs/aiken-handles-personalization'"
+
+[repository]
+user = "koralabs"
+project = "aiken-handles-personalization"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "1.9.0"
+source = "github"
+
+[[dependencies]]
+name = "aiken-lang/fuzz"
+version = "1.0.0"
+source = "github"
+
+[[dependencies]]
+name = "aiken-lang/merkle-patricia-forestry"
+version = "1.1.0"
+source = "github"
