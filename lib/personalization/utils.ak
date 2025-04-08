@@ -1,14 +1,12 @@
 use aiken/builtin.{b_data}
 use aiken/list
-use aiken/option
-use aiken/pairs
+use aiken/pairs.{get_first}
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/credential.{
-  Address, Credential, ScriptCredential, VerificationKeyCredential,
-}
-use aiken/transaction/value.{AssetName}
+use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction/value.{AssetName, PolicyId}
+use common/cip68.{make_reference_asset_name_from_user_asset_name}
 use personalization/configs.{legacy_policy_id, pz_settings_asset_name}
-use personalization/types.{HandleDatum, PZApproverData, PZSettings}
+use personalization/types.{CIP68Datum, PZSettings}
 
 // find reference handle output
 // this output is to one of valid_contracts
@@ -38,15 +36,16 @@ pub fn find_reference_handle_output(
   }
 }
 
-pub fn get_handle_datum(reference_handle_output: Output) -> HandleDatum {
+pub fn get_handle_datum(reference_handle_output: Output) -> CIP68Datum {
   expect InlineDatum(inline_datum) = reference_handle_output.datum
-  expect handle_data: HandleDatum = inline_datum
+  expect handle_data: CIP68Datum = inline_datum
   handle_data
 }
 
 // get handle extra informaion
 // bg_asset and pfp_asset
-// (Option<bg_image>, Option<pfp_image>, Option<bg_asset>, Option<pfp_asset>)
+// (Option<bg_image>, Option<pfp_image>, Option<bg_asset>, 
+// Option<pfp_asset>, Option<validated_by>, Option<trial>, Option<nsfw>)
 //
 pub fn get_handle_extra_information(
   extra: Data,
@@ -56,10 +55,12 @@ pub fn get_handle_extra_information(
   Option<ByteArray>,
   Option<ByteArray>,
   Option<ByteArray>,
+  Option<Int>,
+  Option<Int>,
 ) {
   expect extra_pairs_data: Pairs<Data, Data> = extra
   do_get_handle_extra_information(
-    (None, None, None, None, None),
+    (None, None, None, None, None, None, None),
     extra_pairs_data,
   )
 }
@@ -71,6 +72,8 @@ fn do_get_handle_extra_information(
     Option<ByteArray>,
     Option<ByteArray>,
     Option<ByteArray>,
+    Option<Int>,
+    Option<Int>,
   ),
   extra: Pairs<Data, Data>,
 ) -> (
@@ -79,9 +82,11 @@ fn do_get_handle_extra_information(
   Option<ByteArray>,
   Option<ByteArray>,
   Option<ByteArray>,
+  Option<Int>,
+  Option<Int>,
 ) {
   when result is {
-    (Some(_), Some(_), Some(_), Some(_), Some(_)) -> result
+    (Some(_), Some(_), Some(_), Some(_), Some(_), Some(_), Some(_)) -> result
     _ ->
       when extra is {
         [] -> result
@@ -92,6 +97,8 @@ fn do_get_handle_extra_information(
             bg_asset_opt,
             pfp_asset_opt,
             validated_by_opt,
+            trial_opt,
+            nsfw_opt,
           ) = result
           if bg_image_opt == None && key == b_data("bg_image") {
             expect bg_image: ByteArray = value
@@ -102,6 +109,8 @@ fn do_get_handle_extra_information(
                 bg_asset_opt,
                 pfp_asset_opt,
                 validated_by_opt,
+                trial_opt,
+                nsfw_opt,
               ),
               rest,
             )
@@ -114,6 +123,8 @@ fn do_get_handle_extra_information(
                 bg_asset_opt,
                 pfp_asset_opt,
                 validated_by_opt,
+                trial_opt,
+                nsfw_opt,
               ),
               rest,
             )
@@ -126,6 +137,8 @@ fn do_get_handle_extra_information(
                 Some(bg_asset),
                 pfp_asset_opt,
                 validated_by_opt,
+                trial_opt,
+                nsfw_opt,
               ),
               rest,
             )
@@ -138,6 +151,8 @@ fn do_get_handle_extra_information(
                 bg_asset_opt,
                 Some(pfp_asset),
                 validated_by_opt,
+                trial_opt,
+                nsfw_opt,
               ),
               rest,
             )
@@ -150,6 +165,36 @@ fn do_get_handle_extra_information(
                 bg_asset_opt,
                 pfp_asset_opt,
                 Some(validated_by),
+                trial_opt,
+                nsfw_opt,
+              ),
+              rest,
+            )
+          } else if trial_opt == None && key == b_data("trial") {
+            expect trial: Int = value
+            do_get_handle_extra_information(
+              (
+                bg_image_opt,
+                pfp_image_opt,
+                bg_asset_opt,
+                pfp_asset_opt,
+                validated_by_opt,
+                Some(trial),
+                nsfw_opt,
+              ),
+              rest,
+            )
+          } else if nsfw_opt == None && key == b_data("nsfw") {
+            expect nsfw: Int = value
+            do_get_handle_extra_information(
+              (
+                bg_image_opt,
+                pfp_image_opt,
+                bg_asset_opt,
+                pfp_asset_opt,
+                validated_by_opt,
+                trial_opt,
+                Some(nsfw),
               ),
               rest,
             )
@@ -159,6 +204,39 @@ fn do_get_handle_extra_information(
         }
       }
   }
+}
+
+pub fn get_pz_asset_image(
+  pz_asset_policy_id: PolicyId,
+  pz_asset_name: AssetName,
+  pz_datum_index: Int,
+  refernece_inputs: List<Input>,
+) -> ByteArray {
+  // check asset name is user asset name
+  // and make reference asset name
+  let reference_asset_name =
+    make_reference_asset_name_from_user_asset_name(pz_asset_name)
+
+  // find reference input
+  expect Some(pz_asset_input) = refernece_inputs |> list.at(pz_datum_index)
+  let Input {
+    output: Output { value: output_value, datum: output_datum, .. },
+    ..
+  } = pz_asset_input
+
+  // check value has reference asset
+  let has_reference_asset =
+    value.quantity_of(output_value, pz_asset_policy_id, reference_asset_name) == 1
+  expect has_reference_asset
+
+  // parse datum
+  // and get image from pairs
+  expect InlineDatum(inline_datum) = output_datum
+  expect pz_asset_datum: CIP68Datum = inline_datum
+  expect Some(pz_image_data) = get_first(pz_asset_datum.nft, b_data("image"))
+  expect pz_image: ByteArray = pz_image_data
+
+  pz_image
 }
 
 // get pz settings information from reference inputs
@@ -184,65 +262,48 @@ pub fn get_pz_settings_information(
   (pz_settings.4th, pz_settings.5th, pz_settings.7th)
 }
 
-// get approver information from reference inputs
-// returns approver policy ids MPT root hash
-// ByteArray
-//
-pub fn get_approver_information(
-  reference_inputs: List<Input>,
-  pz_providers: Pairs<ByteArray, ByteArray>,
-  settings_cred: ByteArray,
-  approver_index: Int,
-  approver_asset_name: AssetName,
-) -> ByteArray {
-  expect Some(approver_input) = reference_inputs |> list.at(approver_index)
-  let Input {
-    output: Output {
-      address: Address { payment_credential, .. },
-      value: output_value,
-      datum,
-      ..
-    },
-    ..
-  } = approver_input
-
-  // check approver's address credential
-  // if approver is settings credential
-  // or one of pz providers
-  let is_settings_cred = payment_credential == ScriptCredential(settings_cred)
-  expect or {
-      is_settings_cred,
-      is_approver_pz_provider(payment_credential, pz_providers),
-    }
-
-  // check approver's input value has approver asset handle
-  // "bg_policy_ids" or "pfp_policy_ids"
-  let has_approver_asset =
-    value.quantity_of(output_value, legacy_policy_id, approver_asset_name) == 1
-  expect has_approver_asset
-
-  // parse approver input datum
-  expect InlineDatum(inline_datum) = datum
-  expect approver_data: PZApproverData = inline_datum
-  let PZApproverData { mpt_root_hash } = approver_data
-  mpt_root_hash
+pub fn make_pz_asset_name_proof_value(pz_flags: (Int, Int)) -> ByteArray {
+  when pz_flags is {
+    (0, 0) -> #[0, 0]
+    (0, 1) -> #[0, 1]
+    (1, 0) -> #[1, 0]
+    (1, 1) -> #[1, 1]
+    _ -> fail @"pz flags must be (0, 0), (0, 1) or (1, 0) or (1, 1)"
+  }
 }
 
-fn is_approver_pz_provider(
-  approver_payment_credential: Credential,
-  pz_providers: Pairs<ByteArray, ByteArray>,
+pub fn does_pz_flags_match_with_datum(
+  bg_flags: (Int, Int),
+  pfp_flags: (Int, Int),
+  trial_opt: Option<Int>,
+  nsfw_opt: Option<Int>,
 ) -> Bool {
-  let approver_payment_credential_hash =
-    when approver_payment_credential is {
-      VerificationKeyCredential(verification_key_hash) -> verification_key_hash
-      ScriptCredential(script_hash) -> script_hash
+  let trial =
+    if bg_flags.1st + pfp_flags.1st > 0 {
+      1
+    } else {
+      0
     }
-
-  // search through pz providers values
-  // because it is not signers
-  //
-  pz_providers
-    |> pairs.find_first(approver_payment_credential_hash)
-    |> option.and_then(fn(_) { Some(True) })
-    |> option.or_else(False)
+  let nsfw =
+    if bg_flags.2nd + pfp_flags.2nd > 0 {
+      1
+    } else {
+      0
+    }
+  let is_trial_valid =
+    when trial is {
+      1 -> trial_opt == Some(1)
+      0 -> trial_opt == Some(0) || trial_opt == None
+      _ -> fail @"invalid trial value"
+    }
+  let is_nsfw_valid =
+    when nsfw is {
+      1 -> nsfw_opt == Some(1)
+      0 -> nsfw_opt == Some(0) || nsfw_opt == None
+      _ -> fail @"invalid nsfw value"
+    }
+  and {
+    is_trial_valid,
+    is_nsfw_valid,
+  }
 }

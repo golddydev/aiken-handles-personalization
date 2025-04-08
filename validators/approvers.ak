@@ -8,7 +8,7 @@ validator {
     // must be withdrawal validator
     expect WithdrawFrom(_) = purpose
 
-    let Redeemer { indexes } = redeemer
-    can_personalize_assets(transaction, indexes)
+    let Redeemer { indexes, approver_proofs } = redeemer
+    can_personalize_assets(transaction, indexes, approver_proofs)
   }
 }

@@ -1,3 +1,5 @@
+use aiken/merkle_patricia_forestry as mpt
+
 // redeemer
 pub type Indexes {
   pz_settings_index: Int,
@@ -7,13 +9,35 @@ pub type Indexes {
   pfp_datum_index: Int,
 }
 
+// Approver Proofs
+// *_policy_id_proof: MPT proof for valid * policy id
+// *_policy_id_proof_value: Value of *_policy id in the MPT,
+// either "" or root hash of MPT of *_asset names
+// When empty string, means there is no MPT for asset names
+// *_flags: Flags for trial | nsfw (when 1: True, 0: False)
+// *_asset_name_proof: MPT proof for trial | nsfw *_asset name
+//
+pub type ApproverProofs {
+  // bg
+  bg_policy_id_proof_opt: Option<mpt.Proof>,
+  bg_policy_id_proof_value: ByteArray,
+  bg_flags: (Int, Int),
+  bg_asset_name_proof_opt: Option<mpt.Proof>,
+  // pfp
+  pfp_policy_id_proof_opt: Option<mpt.Proof>,
+  pfp_policy_id_proof_value: ByteArray,
+  pfp_flags: (Int, Int),
+  pfp_asset_name_proof_opt: Option<mpt.Proof>,
+}
+
 pub type Redeemer {
   indexes: Indexes,
+  approver_proofs: ApproverProofs,
 }
 
 /// The generic CIP68 metadata type as defined in the CIP at
 /// https://cips.cardano.org/cips/cip68/.
-pub type HandleDatum {
+pub type CIP68Datum {
   nft: Pairs<Data, Data>,
   version: Int,
   extra: Data,
@@ -42,7 +66,3 @@ pub type PZSettings =
     Int,
     Int,
   )
-
-pub type PZApproverData {
-  mpt_root_hash: ByteArray,
-}

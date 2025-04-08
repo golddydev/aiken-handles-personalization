@@ -136,8 +136,8 @@ enum Datum {
             svg_version: ByteArray, // "3.0.8" to hex format
             agreed_terms: ByteArray, // url
             migrate_sig_required: Int, // boolean
-            nsfw: Int, // boolean
             trial: Int, // boolean
+            nsfw: Int, // boolean
             pz_enabled: Int, // boolean
             last_edited_time: Int,
             bg_asset: ByteArray, // asset id
