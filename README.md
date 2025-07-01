@@ -1,70 +1,24 @@
 # aiken-handles-personalization
 
-## How contracts works
+## Smart Contract Overview
 
-The Personalization contract is used to personalize NFTs.
+The Personalization contract is used to personalize Ada Handle NFTs.
 
-It has 4 redeemers
+This smart contract holds asset name label of `100 - Reference token` and `000 - Virtual Subhandle`.
 
-- PERSONALIZE
+## Handles
 
-- MIGRATE
+There are 3 types of handles.
 
-- REVOKE
+- **Handle**: The normal handle without `@` symbol in its name. (E.g. `papag00se`, `bigirishlion`, `golddy`)
 
-- UPDATE
+- **SubHandle**: The sub handle with `@` in its name. (E.g. `papag00se@kora`, `bigirishlion@kora`, `golddy@kora`)
 
-- RETURN_TO_SENDER
-
-### Before going through Redeeemers
-
-3 Handle types are supported:
-
-```rust
-enum HandleType {
-    HANDLE
-    NFT_SUBHANDLE
-    VIRTUAL_SUBHANDLE
-}
-```
-
-```rust
-struct Handle {
-    type: HandleType
-    name: ByteArray
-}
-```
-
-There are indices used to find PZ asset, addional information from reference inputs or input datum.
-
-```rust
-struct PzIndexes {
-    pfp_approver: Int
-    bg_approver: Int
-    pfp_datum: Int
-    bg_datum: Int
-    required_asset: Int
-    owner_settings: Int
-    contract_output: Int
-    pz_assets: Int
-    provider_fee: Int
-}
-```
-
-There are indices used to update virtual handles.
-
-```rust
-struct VirtIndexes {
-    admin_settings: Int
-    root_settings: Int
-    contract_output: Int
-    root_handle: Int
-}
-```
+  > NOTE: `kora` handle must exist.
 
 ### Types
 
-This is personalization settings.
+#### Personalization Settings
 
 This is loaded from reference input, which contains `pz_settings` handle.
 
@@ -83,6 +37,38 @@ struct PzSettings {
     subhandle_share_percent: Int
 }
 ```
+
+#### OwnerSettings
+
+This is root handle owner settings.
+
+For all NFT Subhandles and Virtual Subhandles, there is owner settings Token.
+
+Asset Name Label is `LBL_001` and name is Root handle name.
+
+```rust
+//(001) token
+struct OwnerSettings {
+    nft: SubHandleSettings
+    virtual: SubHandleSettings
+    buy_down_price: Int
+    buy_down_paid: Int
+    buy_down_percent: Int
+    agreed_terms: Data
+    migrate_sig_required: Int
+    payment_address: ByteArray
+}
+
+struct SubHandleSettings {
+    public_minting_enabled: Int
+    pz_enabled: Int
+    tier_pricing: [][]Int
+    default_styles: Data
+    save_original_address: Int
+}
+```
+
+#### CIP68 Datum
 
 This is most recent handle's datum type
 
@@ -153,24 +139,44 @@ The PERSONALIZE redeemer is used to personalize an NFT.
 
 #### Validations
 
-**Redeemer**
+**Common Rule**
 
-```rust
-PERSONALIZE {
-    handle: Handle
-    root_handle: ByteArray
-    indexes: PzIndexes
-    designer: Map[String]Data
-    reset: Int
-}
-```
+- There must be only one UTxO from transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
 
-- Get Personalization Asset Output
+- First output must be `personalized_output` which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum. (Except when user revokes Virtual Subhandle)
 
-If `reset` set to true find in `reference_inputs`, otherwise find in transaction outputs using `pz_asset_index` from `PzIndexes`.
+**Personalize**
 
-- Handle Name check (redeemer and spending datum)
+1. For `Handle`
 
-Get handle `name` from spending datum and match that with redeemer.
+- second output must be output with `222 - User Token`.
 
--
+- `new_datum` -> `extra` -> `resolved_addresses` -> `ada` must be None.
+
+2. For `NFT_SUBHANDLE`
+
+- must attach `OwnerSetting` Token. This is `LBL_001` Token with root handle name.
+
+- second output must be output with `222 - User Token`.
+
+- `new_datum` -> `extra` -> `resolved_addresses` -> `ada` must be None.
+
+- personalization must be enabled. By matching one these conditions
+
+  - `old_datum` -> `extra` -> `pz_enabled` must be set to `1`, OR
+
+  - root handle allows personalization. `owner_settings` -> `nft` -> `pz_enabled` must be set to `1`.
+
+    - when root handle allows personalization, `new_datum` -> `extra` -> `pz_enabled` must be set to `1`.
+
+3. For `VIRTUAL_SUBHANDLE`
+
+- must attach `OwnerSetting` Token. This is `LBL_001` Token with root handle name.
+
+- personalization must be enabled. By matching one these conditions
+
+  - `old_datum` -> `extra` -> `pz_enabled` must be set to `1`, OR
+
+  - root handle allows personalization. `owner_settings` -> `nft` -> `pz_enabled` must be set to `1`.
+
+    - when root handle allows personalization, `new_datum` -> `extra` -> `pz_enabled` must be set to `1`.

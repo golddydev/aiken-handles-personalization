@@ -38,7 +38,7 @@ pub type Redeemer {
 /// The generic CIP68 metadata type as defined in the CIP at
 /// https://cips.cardano.org/cips/cip68/.
 pub type CIP68Datum {
-  nft: Pairs<Data, Data>,
+  metadata: Pairs<Data, Data>,
   version: Int,
   extra: Data,
 }
