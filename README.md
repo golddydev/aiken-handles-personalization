@@ -133,6 +133,34 @@ enum Datum {
 }
 ```
 
+### Data Structures
+
+We use [aiken-lang MPF](https://github.com/aiken-lang/merkle-patricia-forestry) which is key-value store to handle billions of entries.
+
+#### Approvers MPF
+
+We have `BG Approvers MPF` and `PFP Approvers MPF` to verify allowed NFT Policy IDs for Handle's Background Profile picture.
+
+- `Key`: Policy Id
+
+- `Value`: `Assets Flags MPF` `root_hash`
+
+#### Assets Flags MPF
+
+We have `Assets Flags MPF` for some Policy Ids (for either `BG` or `PFP`) to verify some assets which are `NSFW` (not safe for work) or `Trial`.
+
+- `Key`: Asset Name
+
+  > NOTE: Asset Name include asset name label.
+
+- `Value`: CBOR Hex of 2 integers.
+
+```rust
+// `nsfw` and `trial`
+// 1 -> True, 0 -> False, _ -> fail
+type AssetFlags = (Int, Int)
+```
+
 ### PERSONALIZE
 
 The PERSONALIZE redeemer is used to personalize an NFT.
@@ -143,21 +171,51 @@ The PERSONALIZE redeemer is used to personalize an NFT.
 
 - There must be only one UTxO from transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
 
-- First output must be `personalized_output` which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum. (Except when user revokes Virtual Subhandle)
-
 **Personalize**
+
+0. `Common Checks`
+
+- first output must be `personalized_output` which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum. (Except when user revokes Virtual Subhandle)
+
+- transaction must be signed by `new_extra` -> `validated_by`, if that is set.
+
+- `new_extra` must be valid.
+
+  - check `bg_image` and `bg_asset`.
+
+    - `bg_image` must be set when `bg_asset` is set.
+
+    - `bg_image` must be same as `bg_asset`'s datum's image field (`bg_asset`'s datum must be in [CIP68](https://cips.cardano.org/cip/CIP-68) Format)
+
+    - `bg_asset`'s policy ID must be listed in `BG Approvers MPF`.
+
+  - check `pfp_image` and `pfp_asset`.
+
+    Do same check as `bg_image` and `bg_asset`.
+
+  - check `nsfw` and `trial`.
+
+    - `nsfw` must be set to `1` if either `bg_asset` or `pfp_asset` is `nfsw`.
+
+      check `Assets Flags MPF` for `bg_asset`
+
+    - `trial` must be set to `1` if either `bg_asset` or `pfp_asset` is `trial`.
+
+      check `Assets Flags MPF` for `bg_asset`
 
 1. For `Handle`
 
-- second output must be output with `222 - User Token`.
+- second output must be `user_output` with `222 - User Token`.
 
 - `new_datum` -> `extra` -> `resolved_addresses` -> `ada` must be None.
+
+- `last_update_address` must be same as `user_output` address.
 
 2. For `NFT_SUBHANDLE`
 
 - must attach `OwnerSetting` Token. This is `LBL_001` Token with root handle name.
 
-- second output must be output with `222 - User Token`.
+- second output must be `user_output` with `222 - User Token`.
 
 - `new_datum` -> `extra` -> `resolved_addresses` -> `ada` must be None.
 
@@ -168,6 +226,8 @@ The PERSONALIZE redeemer is used to personalize an NFT.
   - root handle allows personalization. `owner_settings` -> `nft` -> `pz_enabled` must be set to `1`.
 
     - when root handle allows personalization, `new_datum` -> `extra` -> `pz_enabled` must be set to `1`.
+
+- `last_update_address` must be same as `user_output` address.
 
 3. For `VIRTUAL_SUBHANDLE`
 
@@ -180,3 +240,15 @@ The PERSONALIZE redeemer is used to personalize an NFT.
   - root handle allows personalization. `owner_settings` -> `nft` -> `pz_enabled` must be set to `1`.
 
     - when root handle allows personalization, `new_datum` -> `extra` -> `pz_enabled` must be set to `1`.
+
+- transaction must be signed by `Virtual Subhandle Owner`. `old_datum` -> `extra` -> `resolved_addresses` -> `ada`.
+
+- New `Virtual Subhandle Owner` must be same as old one.
+
+- `Virtual Subhandle` Datum must not change. `old_virtual_datum` == `new_virtual_datum`.
+
+  Virtual Subhandle Datum is located in `datum` -> `extra`'s first field's value.
+
+  > NOTE: Need discussion
+
+- `last_update_address` must be same as New `Virtual SubhandleOwner` address. `new_datum` -> `extra` -> `resolved_addresses` -> `ada`.
