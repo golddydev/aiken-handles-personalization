@@ -10,15 +10,19 @@ This smart contract holds asset name label of `100 - Reference token` and `000 -
 
 There are 3 types of handles.
 
-- **Handle**: The normal handle without `@` symbol in its name. (E.g. `papag00se`, `bigirishlion`, `golddy`)
+- **HANDLE**: The normal handle without `@` symbol in its name. (E.g. `papag00se`, `bigirishlion`, `golddy`)
 
-- **SubHandle**: The sub handle with `@` in its name. (E.g. `papag00se@kora`, `bigirishlion@kora`, `golddy@kora`)
+- **NFT_SUBHANDLE**: The sub handle with `@` in its name. (E.g. `papag00se@kora`, `bigirishlion@kora`, `golddy@kora`)
 
   > NOTE: `kora` handle must exist.
 
-### Types
+- **VIRTUAL_SUBHANDLE**: The virtual subhandle with `@` in its name. (E.g. `virtual_goose@kora`).
 
-#### Personalization Settings
+  > NOTE: This asset's asset name label is `LBL_000` and datum is directly attached to this token.
+
+## Types
+
+### Personalization Settings
 
 This is loaded from reference input, which contains `pz_settings` handle.
 
@@ -38,7 +42,7 @@ struct PzSettings {
 }
 ```
 
-#### OwnerSettings
+### OwnerSettings
 
 This is root handle owner settings.
 
@@ -68,7 +72,7 @@ struct SubHandleSettings {
 }
 ```
 
-#### CIP68 Datum
+### CIP68 Datum
 
 This is most recent handle's datum type
 
@@ -133,11 +137,11 @@ enum Datum {
 }
 ```
 
-### Data Structures
+## Data Structures
 
 We use [aiken-lang MPF](https://github.com/aiken-lang/merkle-patricia-forestry) which is key-value store to handle billions of entries.
 
-#### Approvers MPF
+### Approvers MPF
 
 We have `BG Approvers MPF` and `PFP Approvers MPF` to verify allowed NFT Policy IDs for Handle's Background Profile picture.
 
@@ -145,7 +149,7 @@ We have `BG Approvers MPF` and `PFP Approvers MPF` to verify allowed NFT Policy 
 
 - `Value`: `Assets Flags MPF` `root_hash`
 
-#### Assets Flags MPF
+### Assets Flags MPF
 
 We have `Assets Flags MPF` for some Policy Ids (for either `BG` or `PFP`) to verify some assets which are `NSFW` (not safe for work) or `Trial`.
 
@@ -161,19 +165,15 @@ We have `Assets Flags MPF` for some Policy Ids (for either `BG` or `PFP`) to ver
 type AssetFlags = (Int, Int)
 ```
 
-### PERSONALIZE
-
-The PERSONALIZE redeemer is used to personalize an NFT.
-
-#### Validations
+## Validations
 
 **Common Rule**
 
 - There must be only one UTxO from transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
 
-**Personalize**
+### PERSONALIZE
 
-0. `Common Checks`
+**0. `Common Checks`**
 
 - first output must be `personalized_output` which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum. (Except when user revokes Virtual Subhandle)
 
@@ -203,7 +203,7 @@ The PERSONALIZE redeemer is used to personalize an NFT.
 
       check `Assets Flags MPF` for `bg_asset`
 
-1. For `Handle`
+**1. For `Handle`**
 
 - second output must be `user_output` with `222 - User Token`.
 
@@ -211,7 +211,7 @@ The PERSONALIZE redeemer is used to personalize an NFT.
 
 - `last_update_address` must be same as `user_output` address.
 
-2. For `NFT_SUBHANDLE`
+**2. For `NFT_SUBHANDLE`**
 
 - must attach `OwnerSetting` Token. This is `LBL_001` Token with root handle name.
 
@@ -229,7 +229,7 @@ The PERSONALIZE redeemer is used to personalize an NFT.
 
 - `last_update_address` must be same as `user_output` address.
 
-3. For `VIRTUAL_SUBHANDLE`
+**3. For `VIRTUAL_SUBHANDLE`**
 
 - must attach `OwnerSetting` Token. This is `LBL_001` Token with root handle name.
 
