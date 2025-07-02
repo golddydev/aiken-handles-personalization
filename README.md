@@ -20,6 +20,113 @@ There are 3 types of handles.
 
   > NOTE: This asset's asset name label is `LBL_000` and datum is directly attached to this token.
 
+## PERSONALIZE Redeemer Analysis
+
+### Redeemer Structure
+
+```rust
+PERSONALIZE { 
+    handle: Handle              // Handle info (type and name)
+    root_handle: ByteArray      // Root handle name for subhandles
+    indexes: PzIndexes          // Reference input/output indexes
+    designer: Map[String]Data   // Designer settings for personalization
+    reset: Int                  // Flag indicating if this is a reset operation (0 or 1)
+}
+```
+
+### Handle Types and Processing
+
+The contract processes three different handle types with specific validation rules:
+
+#### 1. **HANDLE** (Normal Handle)
+- Uses `LBL_100` (Reference Token)
+- Address comes from the asset output
+- `resolved_addresses.ada` must be None (cannot contain ada resolution)
+- `last_update_address` must match the asset output address
+- No root handle settings validation required
+
+#### 2. **NFT_SUBHANDLE** 
+- Uses `LBL_100` (Reference Token)  
+- Must end with `@{root_handle}` format
+- Requires `OwnerSettings` token (`LBL_001` + root_handle name)
+- `resolved_addresses.ada` must be None
+- Personalization must be enabled either:
+  - At handle level: `old_datum.extra.pz_enabled == 1`, OR
+  - At root level: `owner_settings.nft.pz_enabled == 1`
+- When root allows personalization: `new_datum.extra.pz_enabled` must be set to `1`
+- `last_update_address` must match the asset output address
+
+#### 3. **VIRTUAL_SUBHANDLE**
+- Uses `LBL_000` (Virtual Subhandle)
+- Must end with `@{root_handle}` format  
+- Requires `OwnerSettings` token (`LBL_001` + root_handle name)
+- Must be signed by current Virtual Subhandle owner (`old_datum.extra.resolved_addresses.ada`)
+- New owner address must match old owner address (cannot change ownership)
+- Virtual Subhandle datum must not change (`old_virtual_datum == new_virtual_datum`)
+- Personalization must be enabled (same rules as NFT_SUBHANDLE)
+- `last_update_address` must match the resolved ada address
+
+### Core Validation Logic
+
+#### 1. **Asset Validation**
+- **Background Asset (`bg_asset`)**: Must be approved in BG Approvers MPF
+- **Profile Picture Asset (`pfp_asset`)**: Must be approved in PFP Approvers MPF  
+- **Asset-Image Consistency**: `bg_image` must match `bg_asset`'s datum image field
+- **NSFW/Trial Flags**: Automatically set based on asset flags from MPF lookups
+
+#### 2. **Designer Settings Validation**
+When designer settings are provided (`designer` map is not empty):
+- Settings must match IPFS CID multihash validation
+- Creator-defined constraints must be respected (forced vs optional settings)
+- Bounds checking for numeric properties (font_shadow_size, pfp_zoom, pfp_offset)
+- Color palette restrictions based on creator defaults
+- QR code style validations
+
+#### 3. **Fee Payment Validation**
+Fees are required unless within grace period:
+- **Treasury Fee**: Paid to treasury address with handle name as datum
+- **Provider Fee**: Paid to approved personalization provider
+- **Subhandle Share**: Additional fee for subhandles paid to root handle owner
+- **Grace Period**: No fees required if within `grace_period` after `last_edited_time`
+
+#### 4. **Required Asset Collections**
+Creators can specify required asset collections that must be held:
+- Collection policy ID and name prefix matching
+- Attribute requirements for CIP-68 assets  
+- Asset display requirements (must be shown as pfp/bg or be the handle itself)
+- Required signature validation for restricted backgrounds
+
+#### 5. **Immutable Field Protection**
+Certain fields cannot be changed during personalization:
+- `standard_image` and `standard_image_hash`
+- `original_address` 
+- All NFT metadata except `image` and `mediaType`
+- `agreed_terms` must be set to canonical ToU URL
+
+### Validation Flow Summary
+
+1. **Load PZ Settings** from reference input with `pz_settings` handle
+2. **Validate Handle Type** and extract appropriate address/label
+3. **Check Personalization Permissions** (enabled at handle or root level)
+4. **Load Approver Data** from MPF reference inputs for bg/pfp assets
+5. **Validate Asset Approvals** against MPF data and set NSFW/trial flags
+6. **Verify Designer Settings** against creator constraints and bounds
+7. **Validate Required Assets** if creator specified collection requirements
+8. **Check Fee Payments** (treasury, provider, subhandle share)
+9. **Ensure Immutables Unchanged** and contract output validity
+10. **Confirm Proper Signatures** (validated_by, required signatures, etc.)
+
+### Key Constants
+
+```rust
+const HANDLE_HASH: ByteArray = #f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a
+const LBL_444: ByteArray = #001bc280  // CIP-68 (444) label
+const LBL_222: ByteArray = #000de140  // User token (222) label  
+const LBL_100: ByteArray = #000643b0  // Reference token (100) label
+const LBL_001: ByteArray = #00001070  // Owner settings (001) label
+const LBL_000: ByteArray = #00000000  // Virtual subhandle (000) label
+```
+
 ## Types
 
 ### Personalization Settings
