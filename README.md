@@ -169,17 +169,27 @@ type AssetFlags = (Int, Int)
 
 **Common Rule**
 
-- There must be only one UTxO from transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
+- Spending UTxO must be only one UTxO in transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
 
 ### PERSONALIZE
 
 **0. `Common Checks`**
 
-- first output must be `personalized_output` which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum. (Except when user revokes Virtual Subhandle)
+- Spending UTxO must be from `valid_contracts` from `PzSettings`.
+
+- there will be `ref_output` (output at `ref_output_index`) which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum.
+
+- `ref_output` must be from `valid_contracts` from `PzSettings`.
 
 - transaction must be signed by `new_extra` -> `validated_by`, if that is set.
 
-- `new_extra` must be valid.
+- `new_nft` must be valid. (`CIP68Datum`'s nft field)
+
+  - check immutable fields.
+
+    the fields other than `image` and `mediaType` must be same as the ones from `old_nft`.
+
+- `new_extra` must be valid. (`CIP68Datum`'s extra field)
 
   - check `bg_image` and `bg_asset`.
 
@@ -188,6 +198,8 @@ type AssetFlags = (Int, Int)
     - `bg_image` must be same as `bg_asset`'s datum's image field (`bg_asset`'s datum must be in [CIP68](https://cips.cardano.org/cip/CIP-68) Format)
 
     - `bg_asset`'s policy ID must be listed in `BG Approvers MPF`.
+
+    - personalized_output
 
   - check `pfp_image` and `pfp_asset`.
 
@@ -202,6 +214,10 @@ type AssetFlags = (Int, Int)
     - `trial` must be set to `1` if either `bg_asset` or `pfp_asset` is `trial`.
 
       check `Assets Flags MPF` for `bg_asset`
+
+  - check immutable fields.
+
+    `standard_image`, `standard_image_hash`, `original_address` must be same as the ones from `old_extra`.
 
 **1. For `Handle`**
 
