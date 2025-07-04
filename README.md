@@ -181,6 +181,20 @@ type AssetFlags = (Int, Int)
 
 - `ref_output` must be from `valid_contracts` from `PzSettings`.
 
+- there will be `user_output` (output at `user_output_index`) which has `222 - User Token` and `BG Asset` and `PFP Asset` (if they are set)
+
+  > NOTE: there can be no `user_output` in case of `Virtual Subhandle` with no `BG Asset` and `PFP Asset`.
+
+- there will be `treasury_output` (output at `treasury_output_index`).
+
+  > NOTE: there can be no `treasury_output` when there is `designer` updates or `designer` is updated between `grace_period`.
+
+  - payment credential of `treasury_output`'s address must be `treasury_cred` from `PzSettings`.
+
+  - `treasury_output` must have Inline Datum as ByteArray - Handle Name being personalized.
+
+  - `treasury_output` must have at least `treasury_fee` from `PzSettings`.
+
 - transaction must be signed by `new_extra` -> `validated_by`, if that is set.
 
 - `new_nft` must be valid. (`CIP68Datum`'s nft field)
@@ -219,9 +233,47 @@ type AssetFlags = (Int, Int)
 
     `standard_image`, `standard_image_hash`, `original_address` must be same as the ones from `old_extra`.
 
-**1. For `Handle`**
+  - check `last_edited_time` must be bigger than transaction's validity range's low bound.
 
-- second output must be `user_output` with `222 - User Token`.
+- Check `designer` settings. This is `datum` -> `extra` -> `designer`.
+
+  - either `new_designer` is not None and `new_designer` === `old_designer`
+
+  - otherwise
+
+    - check `BG Asset`'s required asset in `default`. `default` is `bg_datum` -> `extra` as `Pairs<Data, Data>`.
+
+      - transaction must be signed by `default` -> `required_signature`. (if it is set)
+
+      - check `default` -> `require_asset_collections` - `List<ByteArray>`. (if it is set) For any of those asset
+
+        - `user_output` must have that asset.
+
+        - check `default` -> `require_asset_attributes` - `List<ByteArray>`. (if it is set) This is List of ByteArray which looks like `"key:value"` in utf8 format.
+
+          - either `required_asset` (from `requried_asset_collections`) is CIP25. (asset name not starts with Asset Name Label 222 nor 444)
+
+          - or get `required_asset`'s datum (from reference inputs) and retrieve `attributes` of from Datum (either `datum` -> `nft` -> `attributes` or `datum` -> `nft`) and for all `required_attribute` - `"key:value"`
+
+            - `attributes` must have `key` which is starting part of `required_attribute` with the `value` which is ending part of `required_attribute`.
+
+        - check `default` -> `require_asset_displayed`. If it is set, expect `Int` Data and parse it to Bool. Else consider it as False
+
+          - either `required_asset_displayed` is False
+
+          - if `required_asset_displayed` is True
+
+            - either `PFP Asset` must be set and `PFF Asset Name` must be `requried_asset`
+
+            - or `required_asset` is Handle whose asset name is same as the asset which is being personalized. HANDLE_POLICY_ID + LBL_222 + handle_name == `required_asset`
+
+    - check fees are paid correctly.
+
+      - check grace period. If transaction starts before `last_edited_time + grace_period`, don't charge fee. `grace_period` is from `PzSettings`.
+
+      - check `treasury_output`
+
+**1. For `Handle`**
 
 - `new_datum` -> `extra` -> `resolved_addresses` -> `ada` must be None.
 
@@ -230,8 +282,6 @@ type AssetFlags = (Int, Int)
 **2. For `NFT_SUBHANDLE`**
 
 - must attach `OwnerSetting` Token. This is `LBL_001` Token with root handle name.
-
-- second output must be `user_output` with `222 - User Token`.
 
 - `new_datum` -> `extra` -> `resolved_addresses` -> `ada` must be None.
 
