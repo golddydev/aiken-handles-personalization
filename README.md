@@ -185,15 +185,7 @@ type AssetFlags = (Int, Int)
 
   > NOTE: there can be no `user_output` in case of `Virtual Subhandle` with no `BG Asset` and `PFP Asset`.
 
-- there will be `treasury_output` (output at `treasury_output_index`).
-
-  > NOTE: there can be no `treasury_output` when there is `designer` updates or `designer` is updated between `grace_period`.
-
-  - payment credential of `treasury_output`'s address must be `treasury_cred` from `PzSettings`.
-
-  - `treasury_output` must have Inline Datum as ByteArray - Handle Name being personalized.
-
-  - `treasury_output` must have at least `treasury_fee` from `PzSettings`.
+- there can be `treasury_output` (output at `treasury_output_index`) and `root_handle_payment_output` (output at `root_handle_payment_output`).
 
 - transaction must be signed by `new_extra` -> `validated_by`, if that is set.
 
@@ -271,7 +263,37 @@ type AssetFlags = (Int, Int)
 
       - check grace period. If transaction starts before `last_edited_time + grace_period`, don't charge fee. `grace_period` is from `PzSettings`.
 
-      - check `treasury_output`
+      - payment credential of `treasury_output`'s address must be `treasury_cred` from `PzSettings`.
+
+      - `treasury_output` must have Inline Datum as ByteArray - Handle Name being personalized.
+
+      - `treasury_output` must have at least `treasury_fee` from `PzSettings`.
+
+      - check provider fee and shared fee. (if subhandle)
+
+        - fee formula: `shared_fee = pz_min_fee / 100 * subhandle_share_percent`, `provider_fee = pz_min_fee - shared_fee`. (from `PzSettings`)
+
+        - `treasury_output` address must be one of `pz_providers`'s Values. (from `PzSettings`)
+
+        - `treasury_output` value must contain lovelace of `provider_fee`.
+
+        - `treasury_output` datum must be Handle Name.
+
+        - if Handle is Subhandle, there must be `root_handle_payment_output`.
+
+          - `root_handle_payment_output` address must be `payment_address` from `OwnerSettings`.
+
+          - `root_handle_payment_output` value must contain lovelace of `shared_fee`.
+
+          - `root_handle_payment_output` datum must be Handle Name.
+
+      - check `designer` with ipfs hash and `default`.
+
+        > Here `designer` is `Dict<ByteArray, Data>`, not `hash` like other place.
+
+        - check `ipfs` hash matches hash calculated from `designer` `Dict`.
+
+        - check `forced` value which is `default` -> `force_creator_settings` as `Int` -> `Bool`.
 
 **1. For `Handle`**
 
