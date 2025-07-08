@@ -29,16 +29,21 @@ This is loaded from reference input, which contains `pz_settings` handle.
 Reference Input address must be same as `pz_settings.settings_cred` validator address.
 
 ```rust
-struct PzSettings {
-    treasury_fee: Int
-    treasury_cred: ByteArray
-    pz_min_fee: Int
-    pz_providers: Map[ByteArray]ByteArray
-    valid_contracts: []ByteArray
-    admin_creds: []ByteArray
-    settings_cred: ByteArray
-    grace_period: Int
-    subhandle_share_percent: Int
+pub type PzSettings {
+  pz_governor: ByteArray,
+  data: PzSettingsV1,
+}
+
+pub type PzSettingsV1 {
+  treasury_fee: Int,
+  treasury_cred: ByteArray,
+  pz_min_fee: Int,
+  valid_providers: List<ByteArray>,
+  valid_contracts: List<ByteArray>,
+  admin_verification_key_hashes: List<ByteArray>,
+  settings_script_hash: ByteArray,
+  grace_period: Int,
+  subhandle_share_percent: Int,
 }
 ```
 
