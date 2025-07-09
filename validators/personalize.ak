@@ -1,5 +1,5 @@
 use aiken/transaction.{ScriptContext, Spend, Transaction}
-use common/utils.{is_withdrawal_script_executed} as common_utils
+use common/utils.{is_withdrawal_script_executed}
 use configs/settings.{PzSettings, find_pz_settings}
 
 /// NOTE:
@@ -10,6 +10,10 @@ use configs/settings.{PzSettings, find_pz_settings}
 ///
 /// This script hash doesn't change without strong reason.
 /// It only checks if the `pz_governor` withdrawal validator is executed.
+///
+/// When this script can change?
+///
+/// - `configs/settings.ak` is updated.
 /// 
 validator {
   fn spend(_datum: Data, _redeemer: Data, ctx: ScriptContext) -> Bool {
