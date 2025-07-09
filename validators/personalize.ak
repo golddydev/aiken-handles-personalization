@@ -1,7 +1,6 @@
 use aiken/transaction.{ScriptContext, Spend, Transaction}
 use common/utils.{is_withdrawal_script_executed} as common_utils
-use settings/types.{PzSettings}
-use settings/utils.{find_pz_settings}
+use configs/settings.{PzSettings, find_pz_settings}
 
 /// NOTE:
 /// 
