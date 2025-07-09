@@ -4,7 +4,7 @@ use configs/settings.{PzSettings, find_pz_settings}
 
 /// NOTE:
 /// 
-/// This validator is a spending validator
+/// This is a spending validator
 /// where Handle Reference Tokens and Virtual Subhandle Tokens are locked
 /// with CIP68Datum.
 ///
@@ -18,6 +18,7 @@ use configs/settings.{PzSettings, find_pz_settings}
 validator {
   fn spend(_datum: Data, _redeemer: Data, ctx: ScriptContext) -> Bool {
     let ScriptContext { transaction, purpose } = ctx
+
     // must be spending validator
     expect Spend(_) = purpose
 
