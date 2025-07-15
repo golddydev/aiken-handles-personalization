@@ -1,6 +1,10 @@
+use aiken/builtin.{b_data}
 use aiken/bytearray
+use aiken/cbor
 use aiken/dict
 use aiken/list
+use aiken/pairs
+use aiken/string
 use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/value.{AssetName, PolicyId, Value}
 use common/assets.{AssetClass}
@@ -145,4 +149,47 @@ pub fn parse_pz_asset_name(asset_name: AssetName) -> Handle {
   } else {
     fail @"invalid asset name label for pz asset"
   }
+}
+
+// - `new_metadata` must have `image` and `mediaType` (as single value)
+// - for all keys in `old_metadata` other than `image` and `mediaType`,
+//   there must be a corresponding key in `new_metadata` with same value.
+//
+pub fn check_new_metadata(
+  new_metadata: Pairs<Data, Data>,
+  old_metadata: Pairs<Data, Data>,
+) -> (ByteArray, ByteArray) {
+  let new_image_values = pairs.get_all(new_metadata, b_data("image"))
+  let new_media_type_values = pairs.get_all(new_metadata, b_data("mediaType"))
+
+  expect [new_image_data] = new_image_values
+  expect new_image: ByteArray = new_image_data
+  expect [new_media_type_data] = new_media_type_values
+  expect new_media_type: ByteArray = new_media_type_data
+
+  let immutables_stay_same =
+    old_metadata
+      |> pairs.foldl(
+          True,
+          fn(key, value, acc) -> Bool {
+            acc && if key == b_data("image") || key == b_data("mediaType") {
+              True
+            } else {
+              let new_value_opt = pairs.get_first(new_metadata, key)
+              let immutable_stay_same = new_value_opt == Some(value)
+              if immutable_stay_same {
+                True
+              } else {
+                trace string.concat(
+                  @"immutable metadata changed: ",
+                  cbor.diagnostic(key),
+                )
+                False
+              }
+            }
+          },
+        )
+  expect immutables_stay_same
+
+  (new_image, new_media_type)
 }

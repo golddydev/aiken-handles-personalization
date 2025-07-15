@@ -1,10 +1,12 @@
 use aiken/transaction.{Transaction}
 use common/assets.{AssetClass}
+use common/cip68.{CIP68Datum}
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
 use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{
-  check_ref_output, find_pz_utxo, parse_pz_asset_name, parse_pz_indexes,
+  check_new_metadata, check_ref_output, find_pz_utxo, parse_pz_asset_name,
+  parse_pz_indexes,
 }
 
 // Validation:
@@ -28,6 +30,7 @@ pub fn can_personalize(
 
   // must have valid `pz_utxo`
   let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
+  let CIP68Datum { metadata: old_metadata, extra: old_extra, .. } = old_datum
 
   // parse pz_indexes
   let (ref_output, user_output_opt, treasury_output_opt) =
@@ -38,6 +41,19 @@ pub fn can_personalize(
 
   // `ref_output` must be valid
   let new_datum = check_ref_output(ref_output, pz_utxo)
+  let CIP68Datum {
+    metadata: new_metadata,
+    version: new_version,
+    extra: new_extra,
+  } = new_datum
+
+  // `new_version` must be >= 0
+  let is_version_valid = new_version >= 0
+  expect is_version_valid
+
+  // `new_metadata` must be valid
+  let (new_image, new_media_type) =
+    check_new_metadata(new_metadata, old_metadata)
 
   todo
 }
