@@ -1,11 +1,9 @@
-use aiken/bytearray
 use aiken/list
 use aiken/pairs
 use aiken/transaction.{Input, Output, OutputReference, find_input}
 use aiken/transaction/credential.{
   Address, Inline, ScriptCredential, StakeCredential,
 }
-use aiken/transaction/value.{AssetName, PolicyId}
 use common/hashes.{ScriptHash}
 
 /// This function checks if withdrawal validator is executed.
@@ -59,21 +57,4 @@ pub fn get_own_utxos_count(
           },
         )
   own_utxo_count
-}
-
-/// This function checks if bytearray starts with target.
-///
-pub fn bytearray_starts_with(self: ByteArray, target: ByteArray) -> Bool {
-  let target_length = bytearray.length(target)
-  ( self |> bytearray.take(target_length) ) == target
-}
-
-/// This function parses asset id bytearray
-/// into Policy ID and Asset Name.
-///
-pub fn parse_asset_id_bytearray(asset: ByteArray) -> (PolicyId, AssetName) {
-  expect bytearray.length(asset) > 28
-  let (policy_id, asset_name) =
-    (bytearray.take(asset, 28), bytearray.drop(asset, 28))
-  (policy_id, asset_name)
 }
