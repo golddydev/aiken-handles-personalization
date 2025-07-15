@@ -17,15 +17,14 @@ pub fn can_personalize(
 ) -> Bool {
   let Transaction { inputs, reference_inputs, .. } = transaction
 
-  // must attach `Settings` NFT in reference inputs.
+  // must attach `PzSettings` NFT in reference inputs.
   let PzSettings { data: settings_data, .. } =
     find_pz_settings(reference_inputs)
   expect settings_datum: PzSettingsV1 = settings_data
   let PzSettingsV1 { policy_ids, .. } = settings_datum
 
-  // must have only one UTxO with handle Reference Asset or Virtual Subhandle Asset
+  // must have valid `pz_utxo`
   let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
 
-  // pz_utxo must have only one Asset of the given asset_class from redeemer
   todo
 }
