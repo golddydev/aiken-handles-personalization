@@ -5,6 +5,11 @@ use configs/settings_v1.{PzSettingsV1}
 use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{find_pz_utxo}
 
+// Validation:
+//
+// CAUTION: 
+// This function assumes that `policy_ids` from `PzSettingsV1` are always valid ones.
+//
 pub fn can_personalize(
   transaction: Transaction,
   asset_class: AssetClass,
