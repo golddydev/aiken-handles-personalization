@@ -4,7 +4,6 @@ use validations/pz_governor/validation.{can_personalize}
 type PzGovernorRedeemer {
   Personalize
   Reset
-  Migrate
   Revoke
 }
 
@@ -23,7 +22,6 @@ validator {
     when redeemer is {
       Personalize -> can_personalize(transaction)
       Reset -> False
-      Migrate -> False
       Revoke -> False
     }
   }
