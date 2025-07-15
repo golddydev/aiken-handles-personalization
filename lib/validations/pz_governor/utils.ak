@@ -1,11 +1,17 @@
+use aiken/bytearray
 use aiken/dict
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/value.{PolicyId, Value}
+use aiken/transaction/value.{AssetName, PolicyId, Value}
 use common/assets.{AssetClass}
 use common/cip68.{
   CIP68Datum, is_reference_asset_name, is_virtual_subhandle_asset_name,
+  prefix_000, prefix_100,
 }
+use handles/types.{Handle,
+  NFTHandle, NFTSubhandle, VirtualSubhandle} as handles_types
+use handles/utils.{parse_handle_name}
+use validations/pz_governor/types.{PzIndexes}
 
 // - Finds the personalizing UTxO `pz_utxo`
 //   UTxO with Reference Handle or Virtual Subhandle Asset.
@@ -71,4 +77,72 @@ fn does_value_has_reference_handle_asset_or_virtual_subhandle_asset(
               )
         },
       )
+}
+
+// - `ref_output` must have same address, value as `pz_utxo`
+// - `ref_output` must NOT have reference_script
+// - `ref_output` datum must be in CIP68Datum format.
+//
+pub fn check_ref_output(ref_output: Output, pz_utxo: Output) -> CIP68Datum {
+  let Output {
+    address: ref_output_address,
+    value: ref_output_value,
+    datum: new_datum,
+    ..
+  } = ref_output
+  let Output { address: pz_utxo_address, value: pz_utxo_value, .. } = pz_utxo
+
+  let address_is_same = ref_output_address == pz_utxo_address
+  let value_is_same =
+    value.without_lovelace(ref_output_value) == value.without_lovelace(
+      pz_utxo_value,
+    )
+  expect address_is_same
+  expect value_is_same
+
+  expect InlineDatum(new_datum) = new_datum
+  expect cip68_datum: CIP68Datum = new_datum
+
+  cip68_datum
+}
+
+// - retrieve relevants outputs using pz_indexes
+//   ref_output must be not None
+pub fn parse_pz_indexes(
+  outputs: List<Output>,
+  pz_indexes: PzIndexes,
+) -> (Output, Option<Output>, Option<Output>) {
+  let PzIndexes { ref_output_index, user_output_index, treasury_output_index } =
+    pz_indexes
+
+  let ref_output_opt = list.at(outputs, ref_output_index)
+  expect Some(ref_output) = ref_output_opt
+
+  let user_output_opt = list.at(outputs, user_output_index)
+  let treasury_output_opt = list.at(outputs, treasury_output_index)
+
+  (ref_output, user_output_opt, treasury_output_opt)
+}
+
+pub fn parse_pz_asset_name(asset_name: AssetName) -> Handle {
+  let prefix = bytearray.take(asset_name, 4)
+  let handle_name = bytearray.drop(asset_name, 4)
+  let (root_handle_name, is_subhandle, subhandle_name) =
+    parse_handle_name(handle_name)
+
+  if prefix == prefix_100 {
+    // NFTHandle or NFTSubhandle
+    if is_subhandle {
+      NFTSubhandle(handle_name, root_handle_name, subhandle_name)
+    } else {
+      NFTHandle(handle_name)
+    }
+  } else if prefix == prefix_000 {
+    // VirtualSubhandle
+    expect is_subhandle
+
+    VirtualSubhandle(handle_name, root_handle_name, subhandle_name)
+  } else {
+    fail @"invalid asset name label for pz asset"
+  }
 }

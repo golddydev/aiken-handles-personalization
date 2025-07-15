@@ -3,7 +3,9 @@ use common/assets.{AssetClass}
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
 use validations/pz_governor/types.{PzIndexes}
-use validations/pz_governor/utils.{find_pz_utxo}
+use validations/pz_governor/utils.{
+  check_ref_output, find_pz_utxo, parse_pz_asset_name, parse_pz_indexes,
+}
 
 // Validation:
 //
@@ -15,7 +17,8 @@ pub fn can_personalize(
   asset_class: AssetClass,
   pz_indexes: PzIndexes,
 ) -> Bool {
-  let Transaction { inputs, reference_inputs, .. } = transaction
+  let Transaction { inputs, reference_inputs, outputs, .. } = transaction
+  let (policy_id, asset_name) = asset_class
 
   // must attach `PzSettings` NFT in reference inputs.
   let PzSettings { data: settings_data, .. } =
@@ -25,6 +28,16 @@ pub fn can_personalize(
 
   // must have valid `pz_utxo`
   let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
+
+  // parse pz_indexes
+  let (ref_output, user_output_opt, treasury_output_opt) =
+    parse_pz_indexes(outputs, pz_indexes)
+
+  // parse pz_asset_name
+  let pz_handle = parse_pz_asset_name(asset_name)
+
+  // `ref_output` must be valid
+  let new_datum = check_ref_output(ref_output, pz_utxo)
 
   todo
 }

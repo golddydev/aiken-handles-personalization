@@ -1,12 +1,8 @@
-use aiken/transaction/value.{AssetName}
-
-pub type HandleType {
-  NFTHandle
-  NFTSubhandle
-  VirtualSubhandle
-}
-
 pub type Handle {
-  asset_name: AssetName,
-  handle_type: HandleType,
+  // handle_name
+  NFTHandle(ByteArray)
+  // handle_name, root_handle_name, subhandle_name
+  NFTSubhandle(ByteArray, ByteArray, ByteArray)
+  // handle_name, root_handle_name, subhandle_name
+  VirtualSubhandle(ByteArray, ByteArray, ByteArray)
 }
