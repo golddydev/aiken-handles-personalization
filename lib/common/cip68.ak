@@ -1,5 +1,11 @@
 use aiken/bytearray
 
+pub type CIP68Datum {
+  metadata: Pairs<Data, Data>,
+  version: Int,
+  extra: Data,
+}
+
 /// (100) Reference Token Prefix
 pub const prefix_100: ByteArray = #"000643b0"
 

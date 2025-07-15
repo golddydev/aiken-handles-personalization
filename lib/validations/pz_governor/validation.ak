@@ -1,9 +1,15 @@
 use aiken/transaction.{Transaction}
+use common/assets.{AssetClass}
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
+use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{find_pz_utxo}
 
-pub fn can_personalize(transaction: Transaction) -> Bool {
+pub fn can_personalize(
+  transaction: Transaction,
+  asset_class: AssetClass,
+  pz_indexes: PzIndexes,
+) -> Bool {
   let Transaction { inputs, reference_inputs, .. } = transaction
 
   // must attach `Settings` NFT in reference inputs.
@@ -13,7 +19,8 @@ pub fn can_personalize(transaction: Transaction) -> Bool {
   let PzSettingsV1 { policy_ids, .. } = settings_datum
 
   // must have only one UTxO with handle Reference Asset or Virtual Subhandle Asset
-  let pz_utxo = find_pz_utxo(inputs, policy_ids)
+  let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
 
+  // pz_utxo must have only one Asset of the given asset_class from redeemer
   todo
 }
