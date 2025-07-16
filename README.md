@@ -232,6 +232,8 @@ type AssetFlags = (Int, Int)
 
   - check `last_edited_time` must be bigger than transaction's validity range's low bound.
 
+  - `agreed_terms` must be same as `"https://handle.me/$/tou"`.
+
 - Check `designer` settings. This is `datum` -> `extra` -> `designer`.
 
   - either `new_designer` is not None and `new_designer` === `old_designer`
