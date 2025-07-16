@@ -35,14 +35,26 @@ pub type PzSettings {
 }
 
 pub type PzSettingsV1 {
+  // valid handle policy ids
+  policy_ids: List<PolicyId>,
+  // script hash where
+  // all important assets are locked
+  settings_script_hash: ScriptHash,
+  // valid personalization script hashes
+  pz_script_hashes: List<ScriptHash>,
+  // personalization provider script hashes
+  provider_script_hashes: List<ScriptHash>,
+  // treasury script hash
+  treasury_script_hash: ScriptHash,
+  // admin verification key hashes
+  admin_verification_key_hashes: List<VerificationKeyHash>,
+  // treasury fee
   treasury_fee: Int,
-  treasury_cred: ByteArray,
+  // pz min fee
   pz_min_fee: Int,
-  valid_providers: List<ByteArray>,
-  valid_contracts: List<ByteArray>,
-  admin_verification_key_hashes: List<ByteArray>,
-  settings_script_hash: ByteArray,
+  // grace period
   grace_period: Int,
+  // subhandle share percent
   subhandle_share_percent: Int,
 }
 ```
@@ -53,7 +65,7 @@ This is root handle owner settings.
 
 For all NFT Subhandles and Virtual Subhandles, there is owner settings Token.
 
-Asset Name Label is `LBL_001` and name is Root handle name.
+Asset Name Label is `prefix_001` and name is Root handle name.
 
 ```rust
 //(001) token
@@ -79,65 +91,59 @@ struct SubHandleSettings {
 
 ### CIP68 Datum
 
-This is most recent handle's datum type
+Most of Handles are following CIP68 Datum format. See [CIP68](https://cips.cardano.org/cip/CIP-68)
+
+This is most recent handle's datum overview.
 
 ```rust
-enum Datum {
-    CIP68 {
-        nft: Map[String]Data
-        version: Int
-        extra: Data
-    }
+pub type CIP68Datum {
+  metadata: Pairs<Data, Data>,
+  version: Int,
+  extra: Data, // Usually it is Pairs<Data, Data>
 }
 
-enum Datum {
-    CIP68 {
-        // It is Map[String]Data
-        nft: {
-            name: ByteArray,
-            image: ByteArray, // ipfs image
-            mediaType: ByteArray, // "image/jpeg"
-            og: Int, // boolean
-            og_number: Int,
-            rarity: ByteArray, // "basic" | "common" | "rare" | "ultraRare",
-            length: Int, // Handle length
-            characters: ByteArray, // "letters" | "numbers" | "special" - combined with "," when multiple
-            numeric_modifiers: ByteArray, // "negative" | "decimal" - combined with "," when multiple
-            handle_type: ByteArray, // "handle" | "nft_subhandle" | "virtual_subhandle"
-            version: Int, // 1
-
-        },
+type CIP68 {
+    metadata: {
+        name: ByteArray,
+        image: ByteArray, // ipfs image
+        mediaType: ByteArray, // "image/jpeg"
+        og: Int, // boolean
+        og_number: Int,
+        rarity: ByteArray, // "basic" | "common" | "rare" | "ultraRare",
+        length: Int, // Handle length
+        characters: ByteArray, // "letters" | "numbers" | "special" - combined with "," when multiple
+        numeric_modifiers: ByteArray, // "negative" | "decimal" - combined with "," when multiple
+        handle_type: ByteArray, // "handle" | "nft_subhandle" | "virtual_subhandle"
         version: Int, // 1
-        // It is Data
-        extra: {
-            resolved_addresses: {
-                ada?: ByteArray,
-                eth?: ByteArray,
-                btc?: ByteArray,
-            },
-            // []ByteArray
-            bg_image: []Bytearray | ByteArray, // ipfs image
-            pfp_image: []Bytearray | ByteArray, // ipfs image
-            portal: ByteArray, // ipfs file
-            designer: ByteArray, // ipfs file
-            socials: ByteArray, // ipfs file
-            vendor: ByteArray,
-            default: Int,
-            standard_image: ByteArray, // ipfs image
-            last_update_address: ByteArray, // address hex format
-            validated_by: ByteArray, // pub key hash
-            image_hash: ByteArray,
-            standard_image_hash: ByteArray,
-            svg_version: ByteArray, // "3.0.8" to hex format
-            agreed_terms: ByteArray, // url
-            migrate_sig_required: Int, // boolean
-            trial: Int, // boolean
-            nsfw: Int, // boolean
-            pz_enabled: Int, // boolean
-            last_edited_time: Int,
-            bg_asset: ByteArray, // asset id
-            pfp_asset: ByteArray, // asset id
-        }
+    },
+    version: Int, // 1
+    extra: {
+        resolved_addresses: {
+            ada?: ByteArray,
+            eth?: ByteArray,
+            btc?: ByteArray,
+        },
+        bg_image: ByteArray | List<Bytearray>, // ipfs image
+        pfp_image: ByteArray | List<Bytearray>, // ipfs image
+        portal: ByteArray, // ipfs file
+        designer: ByteArray, // ipfs file
+        socials: ByteArray, // ipfs file
+        vendor: ByteArray,
+        default: Int,
+        standard_image: ByteArray, // ipfs image
+        last_update_address: ByteArray, // address hex format
+        validated_by: ByteArray, // pub key hash
+        image_hash: ByteArray,
+        standard_image_hash: ByteArray,
+        svg_version: ByteArray, // "3.0.8" to hex format
+        agreed_terms: ByteArray, // url
+        migrate_sig_required: Int, // boolean
+        trial: Int, // boolean
+        nsfw: Int, // boolean
+        pz_enabled: Int, // boolean
+        last_edited_time: Int,
+        bg_asset: ByteArray, // asset id
+        pfp_asset: ByteArray, // asset id
     }
 }
 ```
@@ -146,29 +152,41 @@ enum Datum {
 
 We use [aiken-lang MPF](https://github.com/aiken-lang/merkle-patricia-forestry) which is key-value store to handle billions of entries.
 
-### Approvers MPF
+This MPF is used keep Policy IDs, which are allowed to be personalized as background or pfp with Handles.
 
-We have `BG Approvers MPF` and `PFP Approvers MPF` to verify allowed NFT Policy IDs for Handle's Background Profile picture.
+This MPF is also used to keep certain Asset IDs, which are trial or nsfw (not safe for work) to be personalized with Handles.
 
-- `Key`: Policy Id
-
-- `Value`: `Assets Flags MPF` `root_hash`
-
-### Assets Flags MPF
-
-We have `Assets Flags MPF` for some Policy Ids (for either `BG` or `PFP`) to verify some assets which are `NSFW` (not safe for work) or `Trial`.
-
-- `Key`: Asset Name
-
-  > NOTE: Asset Name include asset name label.
-
-- `Value`: CBOR Hex of 2 integers.
+Here we will use type called `PzFlags`
 
 ```rust
-// `nsfw` and `trial`
-// 1 -> True, 0 -> False, _ -> fail
-type AssetFlags = (Int, Int)
+// trial, nsfw
+// 0: false, 1: true, otherwise: invalid
+pub type PzFlags =
+  (Int, Int)
+
 ```
+
+### Policies MPF
+
+- `key`: policy id
+
+- `value`: CBOR Hex of `PzFlags`
+
+### Beta Assets MPF
+
+- `key`: asset id
+
+- `value`: CBOR Hex of `PzFlags`
+
+### How to determine Asset is approved for Background or Profile Picture
+
+- Find `PzFlags` for Asset's Policy ID from `Policies MPF`.
+
+  If `PzFlags` are both `1`, then asset is trial and nsfw.
+
+- Find `PzFlags` for Asset's ID from `Beta Assets MPF`.
+
+  Combine `PzFlags` of Policy ID and `PzFlags` of Asset ID.
 
 ## Validations
 
