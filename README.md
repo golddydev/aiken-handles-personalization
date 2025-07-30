@@ -138,8 +138,8 @@ type CIP68 {
         svg_version: ByteArray, // "3.0.8" to hex format
         agreed_terms: ByteArray, // url
         migrate_sig_required: Int, // boolean
-        trial: Int, // boolean
         nsfw: Int, // boolean
+        trial: Int, // boolean
         pz_enabled: Int, // boolean
         last_edited_time: Int,
         bg_asset: ByteArray, // asset id
@@ -154,15 +154,26 @@ We use [aiken-lang MPF](https://github.com/aiken-lang/merkle-patricia-forestry) 
 
 This MPF is used keep Policy IDs, which are allowed to be personalized as background or pfp with Handles.
 
-This MPF is also used to keep certain Asset IDs, which are trial or nsfw (not safe for work) to be personalized with Handles.
+This MPF is also used to keep certain Asset IDs, which are nsfw or trial (not safe for work) to be personalized with Handles.
 
 Here we will use type called `PzFlags`
 
 ```rust
-// trial, nsfw
+// nsfw, trial
 // 0: false, 1: true, otherwise: invalid
 pub type PzFlags =
   (Int, Int)
+
+// pz flags and merkle trie proof
+// this proof is inclusion proof.
+pub type PolicyIdPzFlagsProof =
+  (PzFlags, mpt.Proof)
+
+// pz flags and merkle trie proof
+// when pz flags are None,
+// it means to prove Non-membership of asset id.
+pub type AssetIdPzFlagsProof =
+  (Option<PzFlags>, mpt.Proof)
 
 ```
 
@@ -182,7 +193,7 @@ pub type PzFlags =
 
 - Find `PzFlags` for Asset's Policy ID from `Policies MPF`.
 
-  If `PzFlags` are both `1`, then asset is trial and nsfw.
+  If `PzFlags` are both `1`, then asset is nsfw and trial.
 
 - Find `PzFlags` for Asset's ID from `Beta Assets MPF`.
 
@@ -190,103 +201,141 @@ pub type PzFlags =
 
 ## Validations
 
-**Common Rule**
-
-- Spending UTxO must be only one UTxO in transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
-
 ### PERSONALIZE
 
-**0. `Common Checks`**
+- Spending UTxO (`pz_utxo`) must be only one UTxO in transaction inputs which has either `100 - Reference Token` or `000 - Virtual Subhandle`.
 
-- Spending UTxO must be from `valid_contracts` from `PzSettings`.
+- `ref_output` must be valid. (output indexed by `ref_output_index`)
 
-- there will be `ref_output` (output at `ref_output_index`) which has either `100 - Reference Token` or `000 - Virtual Subhandle` with updated datum.
+  - must have same address and same value as `pz_utxo`.
 
-- `ref_output` must be from `valid_contracts` from `PzSettings`.
+  - must NOT have reference script.
 
-- there will be `user_output` (output at `user_output_index`) which has `222 - User Token` and `BG Asset` and `PFP Asset` (if they are set)
+- check new datum's `metadata`.
 
-  > NOTE: there can be no `user_output` in case of `Virtual Subhandle` with no `BG Asset` and `PFP Asset`.
+  - must have `image` and `mediaType` field as single `ByteArray` value.
 
-- there can be `treasury_output` (output at `treasury_output_index`) and `root_handle_payment_output` (output at `root_handle_payment_output`).
+  - immutable fields (other than `image` and `mediaType`) must stay same.
 
-- transaction must be signed by `new_extra` -> `validated_by`, if that is set.
+- check new datum's `extra`.
 
-- `new_nft` must be valid. (`CIP68Datum`'s nft field)
+  - immutable fields (`standard_image`, `standard_image_hash`, `original_address`) must stay same without key duplicate.
 
-  - check immutable fields.
+  - `agreed_terms` must be `"https://handle.me/$/tou"` as single value.
 
-    the fields other than `image` and `mediaType` must be same as the ones from `old_nft`.
+  - `last_edited_time` must be same as transaction validity range's lower bound as single value.
 
-- `new_extra` must be valid. (`CIP68Datum`'s extra field)
+  - check `validated_by`.
 
-  - check `bg_image` and `bg_asset`.
+    - `validated_by` must be single value or None.
 
-    - `bg_image` must be set when `bg_asset` is set.
+    - transaction must be signed by it if it is set.
 
-    - `bg_image` must be same as `bg_asset`'s datum's image field (`bg_asset`'s datum must be in [CIP68](https://cips.cardano.org/cip/CIP-68) Format)
+  - there must be `PzItems` reference input. (input with `PzItems` assets)
 
-    - `bg_asset`'s policy ID must be listed in `BG Approvers MPF`.
+    - this input must be from `settings_script_hash`.
 
-    - personalized_output
+    - Build `Polices MPF` and `Beta Assets MPF` from `PzItems` datum.
 
-  - check `pfp_image` and `pfp_asset`.
+  - check personlization background and retrieve background asset's PzFlags (for nsfw and trial), if background is set.
 
-    Do same check as `bg_image` and `bg_asset`.
+    - find `bg_image` and `bg_asset` from new datum's `extra`. Both of them must be set as single value or both must be None.
 
-  - check `nsfw` and `trial`.
+      If both are None, `PzFlags` are `(0, 0)`.
 
-    - `nsfw` must be set to `1` if either `bg_asset` or `pfp_asset` is `nfsw`.
+    - `bg_asset` must be valid `AssetClass` with `prefix_222` or `prefix_444`. (either User Token or RFT)
 
-      check `Assets Flags MPF` for `bg_asset`
+    - there must be valid background asset's on-chain datum.
 
-    - `trial` must be set to `1` if either `bg_asset` or `pfp_asset` is `trial`.
+      - there must be background asset's reference Token in reference inputs.
 
-      check `Assets Flags MPF` for `bg_asset`
+      - Datum (`bg_datum`) must be `InlineDatum` with `CIP68Datum` format.
 
-  - check immutable fields.
+    - `bg_image` must be same as background asset's datum's image. (`datum.metadata.image`)
 
-    `standard_image`, `standard_image_hash`, `original_address` must be same as the ones from `old_extra`.
+    - Retrieve background asset's `PzFlags`.
 
-  - check `last_edited_time` must be bigger than transaction's validity range's low bound.
+      - background asset's policy id must be in `Policies MPF` with `PolicyIdPzFlagsProof`.
 
-  - `agreed_terms` must be same as `"https://handle.me/$/tou"`.
+      - if policy id's `PzFlags` are `(1, 1)`, that is also background asset's `PzFlags`. Otherwise check asset id's `PzFlags`.
 
-- Check `designer` settings. This is `datum` -> `extra` -> `designer`.
+      - check background asset id against `Beta Assets MPF` with `AssetIdPzFlagsProof`.
 
-  - either `new_designer` is not None and `new_designer` === `old_designer`
+        - if it proves non membership, asset id's `PzFlags` are `(0, 0)` otherwise value with inclusion proof.
 
-  - otherwise
+        - combine policy id's `PzFlags` and asset id's `PzFlags`. (`flag = Math.min(1, policy id's flag + asset id's flag)`)
 
-    - check `BG Asset`'s required asset in `default`. `default` is `bg_datum` -> `extra` as `Pairs<Data, Data>`.
+    > NOTE: return `bg_datum` to use it later.
 
-      - transaction must be signed by `default` -> `required_signature`. (if it is set)
+  - check personlization pfp and retrieve pfp asset's PzFlags (for nsfw and trial), if pfp is set.
 
-      - check `default` -> `require_asset_collections` - `List<ByteArray>`. (if it is set) For any of those asset
+  - check asset's `PzFlags`.
 
-        - `user_output` must have that asset.
+    - `nsfw` and `trial` must be set in new datum's `extra` as single `Int` value.
 
-        - check `default` -> `require_asset_attributes` - `List<ByteArray>`. (if it is set) This is List of ByteArray which looks like `"key:value"` in utf8 format.
+    - `nsfw` must be 1 if either background asset's `PzFlags`'s `nsfw` or pfp asset's `PzFlags`'s `nsfw` are set. same for `trial`.
 
-          - either `required_asset` (from `requried_asset_collections`) is CIP25. (asset name not starts with Asset Name Label 222 nor 444)
+> NOTE: Check new datum is initial state. (`is_datum_initiated`)
+>
+> - `datum.metadata.image` == `datum.extra.standard_image`
+> - `datum.metadata.image_hash` == `datum.extra.standard_image_hash`
+> - `datum.extra.bg_asset` == `None` (not set)
+> - `datum.extra.pfp_asset` == `None` (not set)
+> - `datum.extra.bg_image` == `None` (not set)
+> - `datum.extra.pfp_image` == `None` (not set)
+> - `datum.extra.designer` == `None` (not set)
+> - `datum.extra.nsfw` == `0`
+> - `datum.extra.trial` == `0`
 
-          - or get `required_asset`'s datum (from reference inputs) and retrieve `attributes` of from Datum (either `datum` -> `nft` -> `attributes` or `datum` -> `nft`) and for all `required_attribute` - `"key:value"`
+- check constraint settings from `BG Asset`. (`default` is `BG Asset`'s datum's extra)
 
-            - `attributes` must have `key` which is starting part of `required_attribute` with the `value` which is ending part of `required_attribute`.
+  - either new `designer` is not None `AND` new `designer` is same as old `designer`.
 
-        - check `default` -> `require_asset_displayed`. If it is set, expect `Int` Data and parse it to Bool. Else consider it as False
+  - or `is_datum_initiated`
 
-          - either `required_asset_displayed` is False
+  - otherwise DO check for required asset and signature.
 
-          - if `required_asset_displayed` is True
+    check `BG Asset`'s required constraints in `default`. `default` is `bg_datum` -> `extra` as `Pairs<Data, Data>`.
 
-            - either `PFP Asset` must be set and `PFF Asset Name` must be `requried_asset`
+    - transaction must be signed by `default` -> `required_signature`. (if it is set)
 
-            - or `required_asset` is Handle whose asset name is same as the asset which is being personalized. HANDLE_POLICY_ID + LBL_222 + handle_name == `required_asset`
+    - check `default` -> `require_asset_collections` - `List<ByteArray>`. (if it is set) For any of those assets
 
-    - check fees are paid correctly.
+      - `user_output` must have that asset.
 
-      - check grace period. If transaction starts before `last_edited_time + grace_period`, don't charge fee. `grace_period` is from `PzSettings`.
+      - check `default` -> `require_asset_attributes` - `List<ByteArray>`. (if it is set) This is List of ByteArray which looks like `"key:value"` in utf8 format.
+
+        - either `required_asset` (from `requried_asset_collections`) is CIP25. (asset name not starts with Asset Name Label 222 nor 444)
+
+        - or get `required_asset`'s datum (from reference inputs) and retrieve `attributes` of from Datum (either `datum` -> `nft` -> `attributes` or `datum` -> `nft`) and for all `required_attribute` - `"key:value"`
+
+          - `attributes` must have `key` which is starting part of `required_attribute` with the `value` which is ending part of `required_attribute`.
+
+      - check `default` -> `require_asset_displayed`. If it is set, expect `Int` Data and parse it to Bool. Else consider it as False
+
+        - either `required_asset_displayed` is False
+
+        - if `required_asset_displayed` is True
+
+          - either `PFP Asset` must be set and `PFF Asset Name` must be `required_asset`
+
+          - or `required_asset` is Handle whose asset name is same as the asset which is being personalized. HANDLE_POLICY_ID + LBL_222 + handle_name == `required_asset`
+
+- check fees are paid correctly.
+
+  - either new `designer` is not None `AND` new `designer` is same as old `designer`.
+
+  - or `is_datum_initiated`
+
+  - otherwise DO check for fee is correctly paid.
+
+    - check grace period. If transaction starts before `last_edited_time + grace_period`, don't charge fee. `grace_period` is from `PzSettings`.
+
+      `last_edited_time` is old `datum.extra.last_edited_time` (can be `None`)
+
+    - treasury fee must be paid correctly.
+
+      - there must be `treasury_output` (output indexed by `treasury_output_index`)
 
       - payment credential of `treasury_output`'s address must be `treasury_cred` from `PzSettings`.
 
@@ -294,31 +343,37 @@ pub type PzFlags =
 
       - `treasury_output` must have at least `treasury_fee` from `PzSettings`.
 
-      - check provider fee and shared fee. (if subhandle)
+    - provider fee must be paid correctly.
 
-        - fee formula: `shared_fee = pz_min_fee / 100 * subhandle_share_percent`, `provider_fee = pz_min_fee - shared_fee`. (from `PzSettings`)
+      fee formula: `shared_fee = pz_min_fee / 100 * subhandle_share_percent`, `provider_fee = pz_min_fee - shared_fee`. (from `PzSettings`)
 
-        - `treasury_output` address must be one of `pz_providers`'s Values. (from `PzSettings`)
+      - there must be `provider_fee_output` (output index by `provider_fee_output_index`)
 
-        - `treasury_output` value must contain lovelace of `provider_fee`.
+      - payment credential of `provider_fee_output` must be one of `provider_script_hashes` from `PzSettings`.
 
-        - `treasury_output` datum must be Handle Name.
+      - `provider_fee_output` must have at least `provider_fee`.
 
-        - if Handle is Subhandle, there must be `root_handle_payment_output`.
+      - `provider_fee_output` must have Inline Datum as ByteArray - Handle Name being personalized.
 
-          - `root_handle_payment_output` address must be `payment_address` from `OwnerSettings`.
+    - shared fee must be paid correctly. (only for Subhandle)
 
-          - `root_handle_payment_output` value must contain lovelace of `shared_fee`.
+      fee formula: `shared_fee = pz_min_fee / 100 * subhandle_share_percent`, `provider_fee = pz_min_fee - shared_fee`. (from `PzSettings`)
 
-          - `root_handle_payment_output` datum must be Handle Name.
+      - there must be `root_handle_payment_output` (output indexed by `root_handle_payment_output_index`).
 
-      - check `designer` with ipfs hash and `default`.
+      - `root_handle_payment_output` address must be `payment_address` from `OwnerSettings`.
 
-        > Here `designer` is `Dict<ByteArray, Data>`, not `hash` like other place.
+      - `root_handle_payment_output` must have value at least `shared_fee`.
 
-        - check `ipfs` hash matches hash calculated from `designer` `Dict`.
+      - `root_handle_payment_output` datum must be Handle Name.
 
-        - check `forced` value which is `default` -> `force_creator_settings` as `Int` -> `Bool`.
+- check `designer` with ipfs hash and `default`.
+
+  > Here `designer` is `Dict<ByteArray, Data>`, not `hash` like other place.
+
+  - check `ipfs` hash matches hash calculated from `designer` `Dict`.
+
+  - check `forced` value which is `default` -> `force_creator_settings` as `Int` -> `Bool`.
 
 **1. For `Handle`**
 

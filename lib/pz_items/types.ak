@@ -1,3 +1,4 @@
+use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction/value.{AssetName, PolicyId}
 
 pub const pz_items_asset_policy_id: PolicyId =
@@ -17,3 +18,14 @@ pub type PzItems {
 // 0: false, 1: true, otherwise: invalid
 pub type PzFlags =
   (Int, Int)
+
+// pz flags and merkle trie proof
+// this proof is inclusion proof.
+pub type PolicyIdPzFlagsProof =
+  (PzFlags, mpt.Proof)
+
+// pz flags and merkle trie proof
+// when pz flags are None, 
+// it means to prove Non-membership of asset id.
+pub type AssetIdPzFlagsProof =
+  (Option<PzFlags>, mpt.Proof)
