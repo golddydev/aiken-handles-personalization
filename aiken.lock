@@ -3,7 +3,7 @@
 
 [[requirements]]
 name = "aiken-lang/stdlib"
-version = "1.9.0"
+version = "1.9.1"
 source = "github"
 
 [[requirements]]
@@ -13,12 +13,12 @@ source = "github"
 
 [[requirements]]
 name = "aiken-lang/merkle-patricia-forestry"
-version = "1.1.1"
+version = "1.1.2"
 source = "github"
 
 [[packages]]
 name = "aiken-lang/stdlib"
-version = "1.9.0"
+version = "1.9.1"
 requirements = []
 source = "github"
 
@@ -30,7 +30,7 @@ source = "github"
 
 [[packages]]
 name = "aiken-lang/merkle-patricia-forestry"
-version = "1.1.1"
+version = "1.1.2"
 requirements = []
 source = "github"
 

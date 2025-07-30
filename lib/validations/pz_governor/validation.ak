@@ -22,9 +22,15 @@ pub fn can_personalize(
   asset_class: AssetClass,
   pz_indexes: PzIndexes,
 ) -> Bool {
-  let Transaction { inputs, reference_inputs, outputs, validity_range, .. } =
-    transaction
-  let (policy_id, asset_name) = asset_class
+  let Transaction {
+    inputs,
+    reference_inputs,
+    outputs,
+    validity_range,
+    extra_signatories,
+    ..
+  } = transaction
+  let (_policy_id, asset_name) = asset_class
 
   // transaction starts after valid time
   let transaction_start_time =
@@ -38,12 +44,20 @@ pub fn can_personalize(
 
   // must have valid `pz_utxo`
   let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
-  let CIP68Datum { metadata: old_metadata, extra: old_extra_data, .. } =
-    old_datum
+  let CIP68Datum {
+    metadata: old_metadata,
+    version: old_version,
+    extra: old_extra_data,
+  } = old_datum
 
   // parse pz_indexes
-  let (ref_output, user_output_opt, treasury_output_opt) =
-    parse_pz_indexes(outputs, pz_indexes)
+  let (
+    ref_output,
+    user_output_opt,
+    treasury_output_opt,
+    provider_fee_output_opt,
+    shared_fee_output_opt,
+  ) = parse_pz_indexes(outputs, pz_indexes)
 
   // parse pz_asset_name
   let pz_handle = parse_pz_asset_name(asset_name)
@@ -57,16 +71,21 @@ pub fn can_personalize(
   } = new_datum
 
   // `new_version` must be >= 0
-  let is_version_valid = new_version >= 0
+  let is_version_valid = new_version >= 0 && new_version >= old_version
   expect is_version_valid
 
   // `new_metadata` must be valid
   let (new_image, new_media_type) =
-    check_new_metadata(new_metadata, old_metadata)
+    check_new_metadata(old_metadata, new_metadata)
 
   // `new extra` must be valid
-  let new_extra =
-    check_new_extra(new_extra_data, old_extra_data, transaction_start_time)
+  let (old_last_edited_time_opt, new_extra) =
+    check_new_extra(
+      new_extra_data,
+      old_extra_data,
+      extra_signatories,
+      transaction_start_time,
+    )
 
   todo
 }

@@ -229,51 +229,51 @@ pub type AssetIdPzFlagsProof =
 
     - `validated_by` must be single value or None.
 
-    - transaction must be signed by it if it is set.
+  - transaction must be signed by it if it is set.
 
-  - there must be `PzItems` reference input. (input with `PzItems` assets)
+- there must be `PzItems` reference input. (input with `PzItems` assets)
 
-    - this input must be from `settings_script_hash`.
+  - this input must be from `settings_script_hash`.
 
-    - Build `Polices MPF` and `Beta Assets MPF` from `PzItems` datum.
+  - Build `Polices MPF` and `Beta Assets MPF` from `PzItems` datum.
 
-  - check personlization background and retrieve background asset's PzFlags (for nsfw and trial), if background is set.
+- check personlization background and retrieve background asset's PzFlags (for nsfw and trial), if background is set.
 
-    - find `bg_image` and `bg_asset` from new datum's `extra`. Both of them must be set as single value or both must be None.
+  - find `bg_image` and `bg_asset` from new datum's `extra`. Both of them must be set as single value or both must be None.
 
-      If both are None, `PzFlags` are `(0, 0)`.
+    If both are None, `PzFlags` are `(0, 0)`.
 
-    - `bg_asset` must be valid `AssetClass` with `prefix_222` or `prefix_444`. (either User Token or RFT)
+  - `bg_asset` must be valid `AssetClass` with `prefix_222` or `prefix_444`. (either User Token or RFT)
 
-    - there must be valid background asset's on-chain datum.
+  - there must be valid background asset's on-chain datum.
 
-      - there must be background asset's reference Token in reference inputs.
+    - there must be background asset's reference Token in reference inputs.
 
-      - Datum (`bg_datum`) must be `InlineDatum` with `CIP68Datum` format.
+    - Datum (`bg_datum`) must be `InlineDatum` with `CIP68Datum` format.
 
-    - `bg_image` must be same as background asset's datum's image. (`datum.metadata.image`)
+  - `bg_image` must be same as background asset's datum's image. (`datum.metadata.image`)
 
-    - Retrieve background asset's `PzFlags`.
+  - Retrieve background asset's `PzFlags`.
 
-      - background asset's policy id must be in `Policies MPF` with `PolicyIdPzFlagsProof`.
+    - background asset's policy id must be in `Policies MPF` with `PolicyIdPzFlagsProof`.
 
-      - if policy id's `PzFlags` are `(1, 1)`, that is also background asset's `PzFlags`. Otherwise check asset id's `PzFlags`.
+    - if policy id's `PzFlags` are `(1, 1)`, that is also background asset's `PzFlags`. Otherwise check asset id's `PzFlags`.
 
-      - check background asset id against `Beta Assets MPF` with `AssetIdPzFlagsProof`.
+    - check background asset id against `Beta Assets MPF` with `AssetIdPzFlagsProof`.
 
-        - if it proves non membership, asset id's `PzFlags` are `(0, 0)` otherwise value with inclusion proof.
+      - if it proves non membership, asset id's `PzFlags` are `(0, 0)` otherwise value with inclusion proof.
 
-        - combine policy id's `PzFlags` and asset id's `PzFlags`. (`flag = Math.min(1, policy id's flag + asset id's flag)`)
+      - combine policy id's `PzFlags` and asset id's `PzFlags`. (`flag = Math.min(1, policy id's flag + asset id's flag)`)
 
-    > NOTE: return `bg_datum` to use it later.
+  > NOTE: return `bg_datum` to use it later.
 
-  - check personlization pfp and retrieve pfp asset's PzFlags (for nsfw and trial), if pfp is set.
+- check personlization pfp and retrieve pfp asset's PzFlags (for nsfw and trial), if pfp is set.
 
-  - check asset's `PzFlags`.
+- check asset's `PzFlags`.
 
-    - `nsfw` and `trial` must be set in new datum's `extra` as single `Int` value.
+  - `nsfw` and `trial` must be set in new datum's `extra` as single `Int` value.
 
-    - `nsfw` must be 1 if either background asset's `PzFlags`'s `nsfw` or pfp asset's `PzFlags`'s `nsfw` are set. same for `trial`.
+  - `nsfw` must be 1 if either background asset's `PzFlags`'s `nsfw` or pfp asset's `PzFlags`'s `nsfw` are set. same for `trial`.
 
 > NOTE: Check new datum is initial state. (`is_datum_initiated`)
 >

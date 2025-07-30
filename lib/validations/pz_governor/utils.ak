@@ -28,7 +28,7 @@ pub fn find_pz_utxo(
       |> list.filter(
           fn(input) -> Bool {
             let Input { output: Output { value: utxo_value, .. }, .. } = input
-            does_value_has_reference_handle_asset_or_virtual_subhandle_asset(
+            does_value_have_reference_handle_asset_or_virtual_subhandle_asset(
               utxo_value,
               policy_ids,
             )
@@ -56,7 +56,7 @@ pub fn find_pz_utxo(
   (pz_output, cip68_datum)
 }
 
-fn does_value_has_reference_handle_asset_or_virtual_subhandle_asset(
+fn does_value_have_reference_handle_asset_or_virtual_subhandle_asset(
   v: Value,
   policy_ids: List<PolicyId>,
 ) -> Bool {
