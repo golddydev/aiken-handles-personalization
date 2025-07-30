@@ -1,0 +1,62 @@
+name: Tests
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          check-latest: true
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install Libssl
+        run: |
+          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb
+
+      - name: Install Aiken
+        run: npm install -g @aiken-lang/aiken@1.0.29-alpha
+
+      - name: Run fmt
+        run: aiken fmt --check
+
+  aiken-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          check-latest: true
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Install Libssl
+        run: |
+          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2.24_amd64.deb
+
+      - name: Install Aiken
+        run: npm install -g @aiken-lang/aiken@1.0.29-alpha
+
+      - name: Run tests
+        run: aiken check
