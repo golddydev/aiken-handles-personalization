@@ -1,13 +1,15 @@
+use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction.{Transaction}
 use common/assets.{AssetClass}
 use common/cip68.{CIP68Datum}
 use common/utils.{check_transaction_is_valid_after_finite_time} as common_utils
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
+use pz_items/utils.{find_pz_items} as pz_items_utils
 use validations/pz_governor/personalize.{
-  check_new_extra, check_new_metadata, parse_pz_indexes,
+  check_new_extra, check_new_metadata, check_pz_assets, parse_pz_indexes,
 }
-use validations/pz_governor/types.{PzIndexes}
+use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
 use validations/pz_governor/utils.{
   check_ref_output, find_pz_utxo, parse_pz_asset_name,
 }
@@ -21,6 +23,7 @@ pub fn can_personalize(
   transaction: Transaction,
   asset_class: AssetClass,
   pz_indexes: PzIndexes,
+  pz_assets_proofs: PzAssetsProofs,
 ) -> Bool {
   let Transaction {
     inputs,
@@ -40,7 +43,7 @@ pub fn can_personalize(
   let PzSettings { data: settings_data, .. } =
     find_pz_settings(reference_inputs)
   expect settings_datum: PzSettingsV1 = settings_data
-  let PzSettingsV1 { policy_ids, .. } = settings_datum
+  let PzSettingsV1 { policy_ids, settings_script_hash, .. } = settings_datum
 
   // must have valid `pz_utxo`
   let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
@@ -85,6 +88,23 @@ pub fn can_personalize(
       old_extra_data,
       extra_signatories,
       transaction_start_time,
+    )
+
+  // there must be `PzItems` reference input. (input with `PzItems` assets)
+  let pz_items = find_pz_items(reference_inputs, settings_script_hash)
+
+  // build Policies MPT and Beta Assets MPT
+  let policies_mpt = mpt.from_root(pz_items.policies)
+  let beta_assets_mpt = mpt.from_root(pz_items.beta_assets)
+
+  // check pz_assets PzFlags
+  let (pz_flags, bg_datum_opt) =
+    check_pz_assets(
+      new_extra,
+      policies_mpt,
+      beta_assets_mpt,
+      pz_assets_proofs,
+      reference_inputs,
     )
 
   todo

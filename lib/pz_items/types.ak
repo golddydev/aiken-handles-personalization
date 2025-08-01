@@ -10,11 +10,11 @@ pub const pz_items_asset_name: AssetName = #"000de140707a5f706f6c6963696573"
 pub type PzItems {
   // approved policy ids for background and pfp
   policies: ByteArray,
-  // beta assets ids (for trial or nsfw)
+  // beta assets ids (for nsfw and trial)
   beta_assets: ByteArray,
 }
 
-// trial, nsfw
+// nsfw, trial
 // 0: false, 1: true, otherwise: invalid
 pub type PzFlags =
   (Int, Int)
@@ -29,3 +29,9 @@ pub type PolicyIdPzFlagsProof =
 // it means to prove Non-membership of asset id.
 pub type AssetIdPzFlagsProof =
   (Option<PzFlags>, mpt.Proof)
+
+// proof for policy id
+// proof for asset id.
+//
+pub type PzAssetProofs =
+  (PolicyIdPzFlagsProof, AssetIdPzFlagsProof)
