@@ -8,7 +8,7 @@ use aiken/transaction/credential.{
   Address, Inline, ScriptCredential, StakeCredential,
 }
 use aiken/transaction/value
-use common/assets.{AssetClass, parse_asset_id}
+use common/assets.{parse_asset_id}
 use common/cip68.{
   CIP68Datum, check_asset_name_is_user_asset_or_rft, get_reference_asset_name,
 }
@@ -115,4 +115,19 @@ pub fn find_datum_by_user_asset_id(
     }
     False -> None
   }
+}
+
+// this function checks
+// - output has asset with asset_id
+// returns: Bool
+//
+pub fn check_output_has_asset_by_asset_id(
+  output: Output,
+  asset_id: ByteArray,
+  quantity: Int,
+) -> Bool {
+  let Output { value: v, .. } = output
+  let (policy_id, asset_name) = parse_asset_id(asset_id)
+  let has_asset = value.quantity_of(v, policy_id, asset_name) == quantity
+  has_asset
 }

@@ -275,7 +275,7 @@ pub type AssetIdPzFlagsProof =
 
   - `nsfw` must be 1 if either background asset's `PzFlags`'s `nsfw` or pfp asset's `PzFlags`'s `nsfw` are set. same for `trial`.
 
-> NOTE: Check new datum is initial state. (`is_datum_initiated`)
+> NOTE: Check new datum is reset. (`is_new_datum_reset`)
 >
 > - `datum.metadata.image` == `datum.extra.standard_image`
 > - `datum.metadata.image_hash` == `datum.extra.standard_image_hash`
@@ -291,7 +291,7 @@ pub type AssetIdPzFlagsProof =
 
   - either new `designer` is not None `AND` new `designer` is same as old `designer`.
 
-  - or `is_datum_initiated`
+  - or new datum is reset `is_new_datum_reset`
 
   - otherwise DO check for required asset and signature.
 

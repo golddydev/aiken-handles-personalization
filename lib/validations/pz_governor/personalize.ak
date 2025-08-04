@@ -1,4 +1,4 @@
-use aiken/builtin.{b_data}
+use aiken/builtin.{b_data, i_data}
 use aiken/cbor
 use aiken/list
 use aiken/merkle_patricia_forestry as mpt
@@ -8,7 +8,9 @@ use aiken/transaction.{Input, Output}
 use common/cip68.{CIP68Datum, get_image_from_cip68_datum}
 use common/collections.{get_single_value_from_pairs}
 use common/hashes.{VerificationKeyHash}
-use common/utils.{find_datum_by_user_asset_id} as common_utils
+use common/utils.{
+  check_output_has_asset_by_asset_id, find_datum_by_user_asset_id,
+} as common_utils
 use handles/constants.{agreed_terms_url}
 use pz_items/types.{PzFlags} as pz_items_types
 use pz_items/utils.{combine_two_pz_flags, default_pz_flags, get_pz_asset_flags}
@@ -48,10 +50,13 @@ pub fn parse_pz_indexes(
 // - for all keys in `old_metadata` other than `image` and `mediaType`,
 //   there must be a corresponding key in `new_metadata` with same value.
 //
+// returns: (new_image, new_media_type)
+//
 pub fn check_new_metadata(
   old_metadata: Pairs<Data, Data>,
   new_metadata: Pairs<Data, Data>,
 ) -> (ByteArray, ByteArray) {
+  // immutable values
   let new_image_value = get_single_value_from_pairs(new_metadata, "image")
   let new_media_type_value =
     get_single_value_from_pairs(new_metadata, "mediaType")
@@ -93,6 +98,8 @@ pub fn check_new_metadata(
 // - `standard_image`, `standard_image_hash`, `original_address` must be same as `old_extra`. (as single value or None)
 // - `agreed_terms` must be same as `agreed_terms_url`.
 // - `last_edited_time` must be same as transaction's start time.
+//
+// returns: (old_last_edited_time_opt, new_extra)
 //
 pub fn check_new_extra(
   old_extra_data: Data,
@@ -174,18 +181,60 @@ pub fn check_new_extra(
   (old_last_edited_time_opt, new_extra)
 }
 
-/// This Function checks
-/// bg_asset and pfp_asset's PzFlags from Policies MPT and Beta Assets MPT
-/// and returns PzFlags 
-/// Also check bg_asset and pfp_asset must be user token or RFT
-/// And check bg_image and pfp_image must be same as bg_asset and pfp_asset's datum's image
-/// and return bg_datum (if bg_image is set)
-///
+// this function checks whether new_datum is reset or not (same as initial value)
+// returns: Bool
+//
+pub fn check_new_datum_reset(
+  new_extra: Pairs<Data, Data>,
+  new_image: ByteArray,
+) -> Bool {
+  let new_image_hash_value =
+    get_single_value_from_pairs(new_extra, "image_hash")
+  let new_standard_image_value =
+    get_single_value_from_pairs(new_extra, "standard_image")
+  let new_standard_image_hash_value =
+    get_single_value_from_pairs(new_extra, "standard_image_hash")
+  let new_bg_image_value = get_single_value_from_pairs(new_extra, "bg_image")
+  let new_pfp_image_value = get_single_value_from_pairs(new_extra, "pfp_image")
+  let new_bg_asset_value = get_single_value_from_pairs(new_extra, "bg_asset")
+  let new_pfp_asset_value = get_single_value_from_pairs(new_extra, "pfp_asset")
+
+  // is `designer` set
+  let new_designer_value = get_single_value_from_pairs(new_extra, "designer")
+  let is_designed = new_designer_value != None
+
+  // get pz flags
+  let new_nsfw_value = get_single_value_from_pairs(new_extra, "nsfw")
+  let new_trial_value = get_single_value_from_pairs(new_extra, "trial")
+
+  let is_new_datum_reset = and {
+      Some(b_data(new_image)) == new_standard_image_value,
+      new_image_hash_value == new_standard_image_hash_value,
+      new_bg_image_value == None,
+      new_pfp_image_value == None,
+      new_bg_asset_value == None,
+      new_pfp_asset_value == None,
+      is_designed == False,
+      Some(i_data(0)) == new_nsfw_value,
+      Some(i_data(0)) == new_trial_value,
+    }
+  is_new_datum_reset
+}
+
+// This Function checks
+// - bg_asset and pfp_asset's PzFlags from Policies MPT and Beta Assets MPT
+// - bg_asset and pfp_asset must be user token or RFT
+// - bg_image and pfp_image must be same as bg_asset and pfp_asset's datum's image
+// - user_output must have bg_asset and pfp_asset if they are set.
+//
+// returns: (PzFlags, Option<CIP68Datum>)
+//
 pub fn check_pz_assets(
   extra: Pairs<Data, Data>,
   policies_mpt: mpt.MerklePatriciaForestry,
   beta_assets_mpt: mpt.MerklePatriciaForestry,
   pz_assets_proofs: PzAssetsProofs,
+  user_output_opt: Option<Output>,
   reference_inputs: List<Input>,
 ) -> (PzFlags, Option<CIP68Datum>) {
   let (bg_asset_proofs_opt, pfp_asset_proofs_opt) = pz_assets_proofs
@@ -229,6 +278,12 @@ pub fn check_pz_assets(
               True
           }
         expect bg_image_match_with_bg_datum
+
+        // check user_output has bg_asset
+        expect Some(user_output) = user_output_opt
+        let has_bg_asset =
+          check_output_has_asset_by_asset_id(user_output, bg_asset_id, 1)
+        expect has_bg_asset
 
         (bg_asset_pz_flags, bg_datum_opt)
       }
@@ -274,6 +329,12 @@ pub fn check_pz_assets(
           }
         expect pfp_image_match_with_pfp_datum
 
+        // check user_output has pfp_asset
+        expect Some(user_output) = user_output_opt
+        let has_pfp_asset =
+          check_output_has_asset_by_asset_id(user_output, pfp_asset_id, 1)
+        expect has_pfp_asset
+
         pfp_asset_pz_flags
       }
       None -> {
@@ -285,4 +346,15 @@ pub fn check_pz_assets(
   let pz_flags = combine_two_pz_flags(bg_asset_pz_flags, pfp_asset_pz_flags)
 
   (pz_flags, bg_datum_opt)
+}
+
+// this function checks bg asset's constraints are met
+// returns: Bool
+//
+pub fn check_bg_asset_constraints(
+  bg_datum: CIP68Datum,
+  user_output_opt: Option<Output>,
+  extra_signatories: List<VerificationKeyHash>,
+) -> Bool {
+  todo
 }

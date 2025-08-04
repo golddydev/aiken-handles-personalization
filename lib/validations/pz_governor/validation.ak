@@ -7,7 +7,8 @@ use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
 use pz_items/utils.{find_pz_items} as pz_items_utils
 use validations/pz_governor/personalize.{
-  check_new_extra, check_new_metadata, check_pz_assets, parse_pz_indexes,
+  check_bg_asset_constraints, check_new_datum_reset, check_new_extra,
+  check_new_metadata, check_pz_assets, parse_pz_indexes,
 }
 use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
 use validations/pz_governor/utils.{
@@ -90,6 +91,9 @@ pub fn can_personalize(
       transaction_start_time,
     )
 
+  // check `is_new_datum_reset`
+  let is_new_datum_reset = check_new_datum_reset(new_extra, new_image)
+
   // there must be `PzItems` reference input. (input with `PzItems` assets)
   let pz_items = find_pz_items(reference_inputs, settings_script_hash)
 
@@ -104,8 +108,17 @@ pub fn can_personalize(
       policies_mpt,
       beta_assets_mpt,
       pz_assets_proofs,
+      user_output_opt,
       reference_inputs,
     )
+
+  // check bg asset's contraints
+  let bg_constraints_met =
+    when bg_datum_opt is {
+      None -> True
+      Some(bg_datum) ->
+        check_bg_asset_constraints(bg_datum, user_output_opt, extra_signatories)
+    }
 
   todo
 }
