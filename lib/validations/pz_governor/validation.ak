@@ -34,7 +34,7 @@ pub fn can_personalize(
     extra_signatories,
     ..
   } = transaction
-  let (_policy_id, asset_name) = asset_class
+  let (policy_id, asset_name) = asset_class
 
   // transaction starts after valid time
   let transaction_start_time =
@@ -64,7 +64,7 @@ pub fn can_personalize(
   ) = parse_pz_indexes(outputs, pz_indexes)
 
   // parse pz_asset_name
-  let pz_handle = parse_pz_asset_name(asset_name)
+  let (pz_handle, handle_name) = parse_pz_asset_name(asset_name)
 
   // `ref_output` must be valid
   let new_datum = check_ref_output(ref_output, pz_utxo)
@@ -102,7 +102,7 @@ pub fn can_personalize(
   let beta_assets_mpt = mpt.from_root(pz_items.beta_assets)
 
   // check pz_assets PzFlags
-  let (pz_flags, bg_datum_opt) =
+  let (pz_flags, bg_datum_opt, bg_asset_id_opt, pfp_asset_id_opt) =
     check_pz_assets(
       new_extra,
       policies_mpt,
@@ -117,8 +117,17 @@ pub fn can_personalize(
     when bg_datum_opt is {
       None -> True
       Some(bg_datum) ->
-        check_bg_asset_constraints(bg_datum, user_output_opt, extra_signatories)
+        check_bg_asset_constraints(
+          bg_datum,
+          user_output_opt,
+          reference_inputs,
+          extra_signatories,
+          pfp_asset_id_opt,
+          policy_id,
+          handle_name,
+        )
     }
+  expect bg_constraints_met
 
   todo
 }

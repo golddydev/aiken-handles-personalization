@@ -105,7 +105,12 @@ pub fn check_ref_output(ref_output: Output, pz_utxo: Output) -> CIP68Datum {
   cip68_datum
 }
 
-pub fn parse_pz_asset_name(asset_name: AssetName) -> Handle {
+// This function
+// parse ref Handle OR Virtual Subhandle's asset_name as Handle
+// 
+// Returns: Handle and handle_name
+//
+pub fn parse_pz_asset_name(asset_name: AssetName) -> (Handle, ByteArray) {
   let prefix = bytearray.take(asset_name, 4)
   let handle_name = bytearray.drop(asset_name, 4)
   let (root_handle_name, is_subhandle, subhandle_name) =
@@ -114,15 +119,18 @@ pub fn parse_pz_asset_name(asset_name: AssetName) -> Handle {
   if prefix == prefix_100 {
     // NFTHandle or NFTSubhandle
     if is_subhandle {
-      NFTSubhandle(handle_name, root_handle_name, subhandle_name)
+      (NFTSubhandle(handle_name, root_handle_name, subhandle_name), handle_name)
     } else {
-      NFTHandle(handle_name)
+      (NFTHandle(handle_name), handle_name)
     }
   } else if prefix == prefix_000 {
     // VirtualSubhandle
     expect is_subhandle
 
-    VirtualSubhandle(handle_name, root_handle_name, subhandle_name)
+    (
+      VirtualSubhandle(handle_name, root_handle_name, subhandle_name),
+      handle_name,
+    )
   } else {
     fail @"invalid asset name label for pz asset"
   }

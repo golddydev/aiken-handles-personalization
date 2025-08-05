@@ -1,6 +1,9 @@
+use aiken/builtin
+use aiken/bytearray
 use aiken/interval.{Finite, IntervalBound}
 use aiken/list
 use aiken/pairs
+use aiken/string
 use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, ValidityRange, find_input,
 }
@@ -12,6 +15,7 @@ use common/assets.{parse_asset_id}
 use common/cip68.{
   CIP68Datum, check_asset_name_is_user_asset_or_rft, get_reference_asset_name,
 }
+use common/collections.{get_single_value_from_pairs}
 use common/hashes.{ScriptHash}
 
 // This function checks if transaction starts
@@ -130,4 +134,76 @@ pub fn check_output_has_asset_by_asset_id(
   let (policy_id, asset_name) = parse_asset_id(asset_id)
   let has_asset = value.quantity_of(v, policy_id, asset_name) == quantity
   has_asset
+}
+
+// This function get `attributes` from CIP68Datum
+// if `metadata` has `attributes` property, that must be Pairs<Data, Data>
+// otherwise, just return `metadata`
+//
+pub fn get_attributes_from_datum(datum: CIP68Datum) -> Pairs<Data, Data> {
+  let CIP68Datum { metadata, .. } = datum
+  let attributes_value = get_single_value_from_pairs(metadata, "attributes")
+  when attributes_value is {
+    Some(attributes_data) -> {
+      expect attributes: Pairs<Data, Data> = attributes_data
+      attributes
+    }
+    None -> metadata
+  }
+}
+
+// This function
+// parse bytearray as attribute key_value (`"key:value"` in utf8 format)
+//
+pub fn parse_attribute_key_value(
+  attribute_bytes: ByteArray,
+) -> (ByteArray, ByteArray, String) {
+  // just check attribute is in valid utf8 format
+  let attribute_string = string.from_bytearray(attribute_bytes)
+
+  when index_of_colon_symbol(attribute_bytes) is {
+    Some(idx) -> {
+      let key = bytearray.take(attribute_bytes, idx)
+      let value = bytearray.drop(attribute_bytes, idx + 1)
+      let is_key_valid = bytearray.length(key) > 0
+      when is_key_valid is {
+        True -> (key, value, attribute_string)
+        False ->
+          fail string.concat(
+            @"required_attribute's key is invalid: ",
+            attribute_string,
+          )
+      }
+    }
+    None ->
+      fail string.concat(@"required_attribute is invalid: ", attribute_string)
+  }
+}
+
+fn index_of_colon_symbol(attribute_bytes: ByteArray) -> Option<Int> {
+  let length = bytearray.length(attribute_bytes)
+  do_index_of_colon_symbol(attribute_bytes, 0, length)
+}
+
+fn do_index_of_colon_symbol(
+  handle_name: ByteArray,
+  idx: Int,
+  length: Int,
+) -> Option<Int> {
+  if idx >= length {
+    None
+  } else {
+    if builtin.index_bytearray(handle_name, idx) == 0x3a {
+      Some(idx)
+    } else {
+      do_index_of_colon_symbol(handle_name, idx + 1, length)
+    }
+  }
+}
+
+pub fn convert_int_to_bool(value: Int) -> Bool {
+  when value is {
+    0 -> False
+    _ -> True
+  }
 }

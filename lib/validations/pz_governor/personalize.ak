@@ -1,15 +1,20 @@
 use aiken/builtin.{b_data, i_data}
+use aiken/bytearray
 use aiken/cbor
+use aiken/int
 use aiken/list
 use aiken/merkle_patricia_forestry as mpt
 use aiken/pairs
 use aiken/string
 use aiken/transaction.{Input, Output}
-use common/cip68.{CIP68Datum, get_image_from_cip68_datum}
+use aiken/transaction/value.{PolicyId}
+use common/cip68.{CIP68Datum, get_image_from_cip68_datum, prefix_222}
 use common/collections.{get_single_value_from_pairs}
 use common/hashes.{VerificationKeyHash}
 use common/utils.{
-  check_output_has_asset_by_asset_id, find_datum_by_user_asset_id,
+  check_output_has_asset_by_asset_id, convert_int_to_bool,
+  find_datum_by_user_asset_id, get_attributes_from_datum,
+  parse_attribute_key_value,
 } as common_utils
 use handles/constants.{agreed_terms_url}
 use pz_items/types.{PzFlags} as pz_items_types
@@ -227,7 +232,8 @@ pub fn check_new_datum_reset(
 // - bg_image and pfp_image must be same as bg_asset and pfp_asset's datum's image
 // - user_output must have bg_asset and pfp_asset if they are set.
 //
-// returns: (PzFlags, Option<CIP68Datum>)
+// returns: (PzFlags, Option<CIP68Datum>, Option<ByteArray>, Option<ByteArray>)
+// PzFlags, Bg Datum, bg_asset_id_opt, pfp_asset_id_opt
 //
 pub fn check_pz_assets(
   extra: Pairs<Data, Data>,
@@ -236,7 +242,7 @@ pub fn check_pz_assets(
   pz_assets_proofs: PzAssetsProofs,
   user_output_opt: Option<Output>,
   reference_inputs: List<Input>,
-) -> (PzFlags, Option<CIP68Datum>) {
+) -> (PzFlags, Option<CIP68Datum>, Option<ByteArray>, Option<ByteArray>) {
   let (bg_asset_proofs_opt, pfp_asset_proofs_opt) = pz_assets_proofs
 
   let bg_asset_data_opt = get_single_value_from_pairs(extra, "bg_asset")
@@ -245,7 +251,7 @@ pub fn check_pz_assets(
   let pfp_image_data_opt = get_single_value_from_pairs(extra, "pfp_image")
 
   // get bg asset's PzFlags
-  let (bg_asset_pz_flags, bg_datum_opt) =
+  let (bg_asset_pz_flags, bg_datum_opt, bg_asset_id_opt) =
     when bg_image_data_opt is {
       Some(bg_image_data) -> {
         expect bg_image: ByteArray = bg_image_data
@@ -285,17 +291,17 @@ pub fn check_pz_assets(
           check_output_has_asset_by_asset_id(user_output, bg_asset_id, 1)
         expect has_bg_asset
 
-        (bg_asset_pz_flags, bg_datum_opt)
+        (bg_asset_pz_flags, bg_datum_opt, Some(bg_asset_id))
       }
       None -> {
         // if bg_image is NOT set, then bg_asset must be NOT set
         expect bg_asset_data_opt == None
-        (default_pz_flags(), None)
+        (default_pz_flags(), None, None)
       }
     }
 
   // get pfp asset's PzFlags
-  let pfp_asset_pz_flags =
+  let (pfp_asset_pz_flags, pfp_asset_id_opt) =
     when pfp_image_data_opt is {
       Some(pfp_image_data) -> {
         expect pfp_image: ByteArray = pfp_image_data
@@ -335,17 +341,17 @@ pub fn check_pz_assets(
           check_output_has_asset_by_asset_id(user_output, pfp_asset_id, 1)
         expect has_pfp_asset
 
-        pfp_asset_pz_flags
+        (pfp_asset_pz_flags, Some(pfp_asset_id))
       }
       None -> {
         // if pfp_image is NOT set, then pfp_asset must be NOT set
         expect pfp_asset_data_opt == None
-        default_pz_flags()
+        (default_pz_flags(), None)
       }
     }
   let pz_flags = combine_two_pz_flags(bg_asset_pz_flags, pfp_asset_pz_flags)
 
-  (pz_flags, bg_datum_opt)
+  (pz_flags, bg_datum_opt, bg_asset_id_opt, pfp_asset_id_opt)
 }
 
 // this function checks bg asset's constraints are met
@@ -354,7 +360,188 @@ pub fn check_pz_assets(
 pub fn check_bg_asset_constraints(
   bg_datum: CIP68Datum,
   user_output_opt: Option<Output>,
+  reference_inputs: List<Input>,
   extra_signatories: List<VerificationKeyHash>,
+  pfp_asset_id_opt: Option<ByteArray>,
+  policy_id: PolicyId,
+  handle_name: ByteArray,
 ) -> Bool {
-  todo
+  // this extra is `default`
+  let CIP68Datum { extra, .. } = bg_datum
+  expect bg_datum_extra: Pairs<Data, Data> = extra
+
+  // check `required_signature` from `bg_datum`'s extra
+  let required_signature_value =
+    get_single_value_from_pairs(bg_datum_extra, "required_signature")
+  let is_tx_signed_by_required_signature =
+    when required_signature_value is {
+      None -> True
+      Some(required_signature_data) -> {
+        expect required_signature: VerificationKeyHash = required_signature_data
+        list.has(extra_signatories, required_signature)
+      }
+    }
+  expect is_tx_signed_by_required_signature
+
+  // check `require_asset_collections`, `require_asset_attributes` and `require_asset_displayed`
+  let required_asset_collections_value =
+    get_single_value_from_pairs(bg_datum_extra, "required_asset_collections")
+  let required_asset_attributes_value =
+    get_single_value_from_pairs(bg_datum_extra, "required_asset_attributes")
+  let required_asset_displayed_value =
+    get_single_value_from_pairs(bg_datum_extra, "required_asset_displayed")
+  when required_asset_collections_value is {
+    None ->
+      // if `required_asset_collections` is not set, there is not bg asset constraints
+      True
+    Some(required_asset_collections_data) -> {
+      // `required_asset_collections` must be List<ByteArray> when it is set.
+      // This is a list of Asset Ids
+      expect required_asset_collections: List<ByteArray> =
+        required_asset_collections_data
+
+      // there must be user_output
+      expect Some(user_output) = user_output_opt
+
+      // for any of those assets
+      required_asset_collections
+        |> list.any(
+            fn(required_asset_id) -> Bool {
+              // check user_output has required asset
+              let user_output_has_required_asset =
+                check_output_has_asset_by_asset_id(
+                  user_output,
+                  required_asset_id,
+                  1,
+                )
+
+              // check required_asset_attributes
+              let required_asset_attributes_met =
+                when required_asset_attributes_value is {
+                  None -> True
+                  Some(required_asset_attributes_data) -> {
+                    expect required_asset_attributes: List<ByteArray> =
+                      required_asset_attributes_data
+                    check_required_asset_attributes(
+                      required_asset_id,
+                      required_asset_attributes,
+                      reference_inputs,
+                    )
+                  }
+                }
+
+              // check `required_asset_displayed`
+              let must_display =
+                when required_asset_displayed_value is {
+                  None -> True
+                  Some(required_asset_displayed_data) -> {
+                    expect required_asset_displayed: Int =
+                      required_asset_displayed_data
+                    convert_int_to_bool(required_asset_displayed)
+                  }
+                }
+              let required_asset_displayed_met =
+                when must_display is {
+                  True -> {
+                    // pfp_asset must be required_asset OR current handle (being personalized) is required_asset
+                    let is_pfp_asset_required_asset =
+                      pfp_asset_id_opt == Some(required_asset_id)
+                    let user_handle_asset_name =
+                      bytearray.concat(prefix_222, handle_name)
+                    let user_handle_asset_id =
+                      bytearray.concat(policy_id, user_handle_asset_name)
+                    let is_handle_required_asset =
+                      user_handle_asset_id == required_asset_id
+                    let required_asset_displayed_met = or {
+                        is_pfp_asset_required_asset,
+                        is_handle_required_asset,
+                      }
+                    required_asset_displayed_met
+                  }
+                  False ->
+                    // we don't check when flag is False
+                    True
+                }
+              let required_asset_met = and {
+                  user_output_has_required_asset,
+                  required_asset_attributes_met,
+                  required_asset_displayed_met,
+                }
+              required_asset_met
+            },
+          )
+    }
+  }
+}
+
+// This function checks 
+// required_asset's datum (required_asset is User Token or RFT, so there must be reference token in reference inputs)
+// has all required_asset_attributes (List<ByteArray>, each ByteArray is `key:value` in utf8 format)
+// NOTE:
+// `required_asset_id` must be User Token or RFT
+//
+fn check_required_asset_attributes(
+  required_asset_id: ByteArray,
+  required_asset_attributes: List<ByteArray>,
+  reference_inputs: List<Input>,
+) -> Bool {
+  let required_asset_datum_opt =
+    find_datum_by_user_asset_id(required_asset_id, reference_inputs)
+  when required_asset_datum_opt is {
+    Some(required_asset_datum) -> {
+      let attributes = get_attributes_from_datum(required_asset_datum)
+      // for all required_asset_attributes
+      required_asset_attributes
+        |> list.all(
+            fn(required_asset_attribute: ByteArray) -> Bool {
+              let (required_key, required_value, attribute_string) =
+                parse_attribute_key_value(required_asset_attribute)
+              let value = get_single_value_from_pairs(attributes, required_key)
+              let attribute_value_match =
+                check_attribute_value_with_data(required_value, value)
+              when attribute_value_match is {
+                True -> True
+                False -> {
+                  trace string.concat(
+                    @"required_asset_attribute not met: ",
+                    attribute_string,
+                  )
+                  False
+                }
+              }
+            },
+          )
+    }
+    None ->
+      // when required_asset is CIP25, we couldn't check required_asset_attributes
+      // we just approve it
+      True
+  }
+}
+
+// This function checks
+// `value` match with `required_value`
+// when `required_value` is valid Int (in utf8 format), value must be Int
+// when `required_value` is not-empty ByteArray, `value` must be ByteArray with same value
+// when `required_value` is `#""`, `value` must be None or empty ByteArray
+//
+fn check_attribute_value_with_data(
+  required_value: ByteArray,
+  value: Option<Data>,
+) -> Bool {
+  let required_int_valude_opt = int.from_utf8(required_value)
+
+  when required_int_valude_opt is {
+    Some(required_int_value) -> value == Some(i_data(required_int_value))
+    None -> {
+      let is_empty_value = bytearray.length(required_value) == 0
+      when is_empty_value is {
+        True -> or {
+            value == None,
+            value == Some(b_data("")),
+          }
+        False -> value == Some(b_data(required_value))
+      }
+    }
+  }
 }

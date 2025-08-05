@@ -289,37 +289,31 @@ pub type AssetIdPzFlagsProof =
 
 - check constraint settings from `BG Asset`. (`default` is `BG Asset`'s datum's extra)
 
-  - either new `designer` is not None `AND` new `designer` is same as old `designer`.
+  check `BG Asset`'s required constraints in `default`. `default` is `bg_datum` -> `extra` as `Pairs<Data, Data>`.
 
-  - or new datum is reset `is_new_datum_reset`
+  - transaction must be signed by `default` -> `required_signature`. (if it is set)
 
-  - otherwise DO check for required asset and signature.
+  - check `default` -> `required_asset_collections` - `List<ByteArray>`. (if it is set) For any of those assets
 
-    check `BG Asset`'s required constraints in `default`. `default` is `bg_datum` -> `extra` as `Pairs<Data, Data>`.
+    - `user_output` must have that asset.
 
-    - transaction must be signed by `default` -> `required_signature`. (if it is set)
+    - check `default` -> `required_asset_attributes` - `List<ByteArray>`. (if it is set) This is List of ByteArray which looks like `"key:value"` in utf8 format.
 
-    - check `default` -> `require_asset_collections` - `List<ByteArray>`. (if it is set) For any of those assets
+      - either `required_asset` (from `requried_asset_collections`) is CIP25. (asset name not starts with Asset Name Label 222 nor 444)
 
-      - `user_output` must have that asset.
+      - or get `required_asset`'s datum (from reference inputs) and retrieve `attributes` of from Datum (either `datum` -> `nft` -> `attributes` or `datum` -> `nft`) and for all `required_attribute` (which is `"key:value"`)
 
-      - check `default` -> `require_asset_attributes` - `List<ByteArray>`. (if it is set) This is List of ByteArray which looks like `"key:value"` in utf8 format.
+        - `attributes` must have `key` with matching `value` (`value` can be either Int or ByteArray).
 
-        - either `required_asset` (from `requried_asset_collections`) is CIP25. (asset name not starts with Asset Name Label 222 nor 444)
+    - check `default` -> `required_asset_displayed`. If it is set, expect `Int` Data and parse it to Bool. Else consider it as False
 
-        - or get `required_asset`'s datum (from reference inputs) and retrieve `attributes` of from Datum (either `datum` -> `nft` -> `attributes` or `datum` -> `nft`) and for all `required_attribute` - `"key:value"`
+      - either `required_asset_displayed` is False
 
-          - `attributes` must have `key` which is starting part of `required_attribute` with the `value` which is ending part of `required_attribute`.
+      - if `required_asset_displayed` is True
 
-      - check `default` -> `require_asset_displayed`. If it is set, expect `Int` Data and parse it to Bool. Else consider it as False
+        - either `PFP Asset` must be set and `PFF Asset Name` must be `required_asset`
 
-        - either `required_asset_displayed` is False
-
-        - if `required_asset_displayed` is True
-
-          - either `PFP Asset` must be set and `PFF Asset Name` must be `required_asset`
-
-          - or `required_asset` is Handle whose asset name is same as the asset which is being personalized. HANDLE_POLICY_ID + LBL_222 + handle_name == `required_asset`
+        - or `required_asset` is Handle whose asset name is same as the asset which is being personalized. HANDLE_POLICY_ID + LBL_222 + handle_name == `required_asset`
 
 - check fees are paid correctly.
 
