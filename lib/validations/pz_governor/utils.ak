@@ -15,6 +15,7 @@ use handles/utils.{parse_handle_name}
 // - Finds the personalizing UTxO `pz_utxo`
 //   UTxO with Reference Handle or Virtual Subhandle Asset.
 //   Handle Assets can have several policy ids.
+// - `pz_utxo` must be the only UTxO in inputs with referrence handle or Virtual Subhandle asset.
 // - `pz_utxo` must have only one Asset of the given `asset_class` from redeemer.
 // - `pz_utxo` datum must be in CIP68Datum format.
 //
@@ -35,12 +36,12 @@ pub fn find_pz_utxo(
           },
         )
 
-  // `pz_utxo` must have only one Asset of the given `asset_class` from redeemer.
+  // `pz_utxo` must be the only UTxO in inputs with referrence handle or Virtual Subhandle asset.
   expect [pz_input] = pz_inputs
   let Input { output: pz_output, .. } = pz_input
   let Output { value: pz_utxo_value, datum, .. } = pz_output
 
-  // must have only one Asset of the given `asset_class` from redeemer
+  // `pz_utxo` must have only one Asset of the given `asset_class` from redeemer.
   let (policy_id, asset_name) = asset_class
   let has_only_one_asset =
     value.without_lovelace(pz_utxo_value) == (
