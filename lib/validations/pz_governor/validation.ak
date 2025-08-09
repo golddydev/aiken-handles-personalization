@@ -25,6 +25,7 @@ pub fn can_personalize(
   asset_class: AssetClass,
   pz_indexes: PzIndexes,
   pz_assets_proofs: PzAssetsProofs,
+  designer: Pairs<Data, Data>,
 ) -> Bool {
   let Transaction {
     inputs,
@@ -129,5 +130,6 @@ pub fn can_personalize(
     }
   expect bg_constraints_met
 
+  // check designer settings
   todo
 }

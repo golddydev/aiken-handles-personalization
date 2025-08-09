@@ -315,6 +315,15 @@ pub type AssetIdPzFlagsProof =
 
         - or `required_asset` is Handle whose asset name is same as the asset which is being personalized. HANDLE_POLICY_ID + LBL_222 + handle_name == `required_asset`
 
+- check `designer` with ipfs hash and `default`.
+
+  > Here `designer` is `Pair<ByteArray, Data>` from redeemer
+  > `designer` from datum's `extra` is actually designer's IPFS Hash
+
+  - check `ipfs` hash matches hash calculated from `designer`.
+
+  - check `forced` value which is `default` -> `force_creator_settings` as `Int` -> `Bool`.
+
 - check fees are paid correctly.
 
   - either new `designer` is not None `AND` new `designer` is same as old `designer`.
@@ -360,14 +369,6 @@ pub type AssetIdPzFlagsProof =
       - `root_handle_payment_output` must have value at least `shared_fee`.
 
       - `root_handle_payment_output` datum must be Handle Name.
-
-- check `designer` with ipfs hash and `default`.
-
-  > Here `designer` is `Dict<ByteArray, Data>`, not `hash` like other place.
-
-  - check `ipfs` hash matches hash calculated from `designer` `Dict`.
-
-  - check `forced` value which is `default` -> `force_creator_settings` as `Int` -> `Bool`.
 
 **1. For `Handle`**
 
