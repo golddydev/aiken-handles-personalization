@@ -4,7 +4,7 @@ use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
 use validations/pz_governor/validation.{can_personalize}
 
 type PzGovernorRedeemer {
-  Personalize(AssetClass, PzIndexes, PzAssetsProofs, Pairs<Data, Data>)
+  Personalize(AssetClass, PzIndexes, PzAssetsProofs)
   Reset
   Revoke
 }
@@ -22,14 +22,8 @@ validator {
     expect WithdrawFrom(_) = purpose
 
     when redeemer is {
-      Personalize(asset_class, pz_indexes, pz_assets_proofs, designer) ->
-        can_personalize(
-          transaction,
-          asset_class,
-          pz_indexes,
-          pz_assets_proofs,
-          designer,
-        )
+      Personalize(asset_class, pz_indexes, pz_assets_proofs) ->
+        can_personalize(transaction, asset_class, pz_indexes, pz_assets_proofs)
       Reset -> False
       Revoke -> False
     }

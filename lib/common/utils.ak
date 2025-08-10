@@ -19,7 +19,7 @@ use common/collections.{get_single_value_from_pairs}
 use common/hashes.{ScriptHash}
 
 // This function checks if transaction starts
-// after from finit time
+// after from finite time
 pub fn check_transaction_is_valid_after_finite_time(
   validity_range: ValidityRange,
 ) -> Int {

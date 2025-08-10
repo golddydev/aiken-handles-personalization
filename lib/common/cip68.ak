@@ -66,7 +66,8 @@ pub fn check_asset_name_is_user_asset_or_rft(
 }
 
 /// This function returns reference asset name from any asset name (user or RFT)
-/// NOTE:
+///
+/// CAUTION:
 /// this function assumes that asset name is CIP-68
 ///
 pub fn get_reference_asset_name(cip68_asset_name: AssetName) -> AssetName {

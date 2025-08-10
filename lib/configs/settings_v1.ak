@@ -4,6 +4,8 @@ use common/hashes.{ScriptHash, VerificationKeyHash}
 pub type PzSettingsV1 {
   // valid handle policy ids
   policy_ids: List<PolicyId>,
+  // bg_constraints_governor script hash
+  bg_constraints_governor: ScriptHash,
   // script hash where 
   // all important assets are locked
   settings_script_hash: ScriptHash,

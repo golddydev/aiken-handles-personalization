@@ -1,5 +1,39 @@
 use aiken/builtin
 use aiken/bytearray
+use aiken/transaction/value.{AssetName}
+use common/cip68.{prefix_000, prefix_100}
+use handles/types.{Handle, NFTHandle, NFTSubhandle, VirtualSubhandle}
+
+// This function
+// parse Ref Handle OR Virtual Subhandle's asset_name as Handle
+// 
+// Returns: Handle and handle_name
+//
+pub fn parse_handle_asset_name(asset_name: AssetName) -> (Handle, ByteArray) {
+  let prefix = bytearray.take(asset_name, 4)
+  let handle_name = bytearray.drop(asset_name, 4)
+  let (root_handle_name, is_subhandle, subhandle_name) =
+    parse_handle_name(handle_name)
+
+  if prefix == prefix_100 {
+    // NFTHandle or NFTSubhandle
+    if is_subhandle {
+      (NFTSubhandle(handle_name, root_handle_name, subhandle_name), handle_name)
+    } else {
+      (NFTHandle(handle_name), handle_name)
+    }
+  } else if prefix == prefix_000 {
+    // VirtualSubhandle
+    expect is_subhandle
+
+    (
+      VirtualSubhandle(handle_name, root_handle_name, subhandle_name),
+      handle_name,
+    )
+  } else {
+    fail @"invalid asset name label for pz asset"
+  }
+}
 
 // Get root_handle_name (empty if handle is not Subhandle)
 // Get is_subhandle and subhandle_name (Empty when handle is not Subhandle)

@@ -1,22 +1,19 @@
 use aiken/builtin.{b_data, i_data}
-use aiken/bytearray
 use aiken/cbor
-use aiken/int
 use aiken/list
 use aiken/merkle_patricia_forestry as mpt
 use aiken/pairs
 use aiken/string
 use aiken/transaction.{Input, Output}
-use aiken/transaction/value.{PolicyId}
-use common/cip68.{CIP68Datum, get_image_from_cip68_datum, prefix_222}
+use common/cip68.{CIP68Datum, get_image_from_cip68_datum}
 use common/collections.{get_single_value_from_pairs}
 use common/hashes.{VerificationKeyHash}
 use common/utils.{
-  check_output_has_asset_by_asset_id, convert_int_to_bool,
-  find_datum_by_user_asset_id, get_attributes_from_datum,
-  parse_attribute_key_value,
+  check_output_has_asset_by_asset_id, find_datum_by_user_asset_id,
 } as common_utils
+use configs/settings_v1.{PzSettingsV1}
 use handles/constants.{agreed_terms_url}
+use handles/types.{Handle} as handles_types
 use pz_items/types.{PzFlags} as pz_items_types
 use pz_items/utils.{combine_two_pz_flags, default_pz_flags, get_pz_asset_flags}
 use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
@@ -58,8 +55,8 @@ pub fn parse_pz_indexes(
 // returns: (new_image, new_media_type)
 //
 pub fn check_new_metadata(
-  old_metadata: Pairs<Data, Data>,
   new_metadata: Pairs<Data, Data>,
+  old_metadata: Pairs<Data, Data>,
 ) -> (ByteArray, ByteArray) {
   // immutable values
   let new_image_value = get_single_value_from_pairs(new_metadata, "image")
@@ -98,23 +95,19 @@ pub fn check_new_metadata(
   (new_image, new_media_type)
 }
 
-// - both `old_extra` and `new_extra` must be in Pairs<Data, Data> format.
 // - transaction must be signed by `validated_by` if it is set as single value.
 // - `standard_image`, `standard_image_hash`, `original_address` must be same as `old_extra`. (as single value or None)
 // - `agreed_terms` must be same as `agreed_terms_url`.
 // - `last_edited_time` must be same as transaction's start time.
 //
-// returns: (old_last_edited_time_opt, new_extra)
+// returns: Option<Int>
 //
 pub fn check_new_extra(
-  old_extra_data: Data,
-  new_extra_data: Data,
+  new_extra: Pairs<Data, Data>,
+  old_extra: Pairs<Data, Data>,
   extra_signatories: List<VerificationKeyHash>,
   transaction_start_time: Int,
-) -> (Option<Int>, Pairs<Data, Data>) {
-  expect new_extra: Pairs<Data, Data> = new_extra_data
-  expect old_extra: Pairs<Data, Data> = old_extra_data
-
+) -> Option<Int> {
   // tansaction must be signed by `validated_by` if it is set as single value.
   let validated_by_value =
     get_single_value_from_pairs(new_extra, "validated_by")
@@ -183,7 +176,7 @@ pub fn check_new_extra(
       }
     }
 
-  (old_last_edited_time_opt, new_extra)
+  old_last_edited_time_opt
 }
 
 // this function checks whether new_datum is reset or not (same as initial value)
@@ -245,10 +238,10 @@ pub fn check_pz_assets(
 ) -> (PzFlags, Option<CIP68Datum>, Option<ByteArray>, Option<ByteArray>) {
   let (bg_asset_proofs_opt, pfp_asset_proofs_opt) = pz_assets_proofs
 
-  let bg_asset_data_opt = get_single_value_from_pairs(extra, "bg_asset")
   let bg_image_data_opt = get_single_value_from_pairs(extra, "bg_image")
-  let pfp_asset_data_opt = get_single_value_from_pairs(extra, "pfp_asset")
+  let bg_asset_data_opt = get_single_value_from_pairs(extra, "bg_asset")
   let pfp_image_data_opt = get_single_value_from_pairs(extra, "pfp_image")
+  let pfp_asset_data_opt = get_single_value_from_pairs(extra, "pfp_asset")
 
   // get bg asset's PzFlags
   let (bg_asset_pz_flags, bg_datum_opt, bg_asset_id_opt) =
@@ -354,194 +347,33 @@ pub fn check_pz_assets(
   (pz_flags, bg_datum_opt, bg_asset_id_opt, pfp_asset_id_opt)
 }
 
-// this function checks bg asset's constraints are met
+// This function checks
+// corresponding fees are paid correctly
 // returns: Bool
 //
-pub fn check_bg_asset_constraints(
-  bg_datum: CIP68Datum,
-  user_output_opt: Option<Output>,
-  reference_inputs: List<Input>,
-  extra_signatories: List<VerificationKeyHash>,
-  pfp_asset_id_opt: Option<ByteArray>,
-  policy_id: PolicyId,
-  handle_name: ByteArray,
-) -> Bool {
-  // this extra is `default`
-  let CIP68Datum { extra, .. } = bg_datum
-  expect bg_datum_extra: Pairs<Data, Data> = extra
-
-  // check `required_signature` from `bg_datum`'s extra
-  let required_signature_value =
-    get_single_value_from_pairs(bg_datum_extra, "required_signature")
-  let is_tx_signed_by_required_signature =
-    when required_signature_value is {
-      None -> True
-      Some(required_signature_data) -> {
-        expect required_signature: VerificationKeyHash = required_signature_data
-        list.has(extra_signatories, required_signature)
-      }
-    }
-  expect is_tx_signed_by_required_signature
-
-  // check `require_asset_collections`, `require_asset_attributes` and `require_asset_displayed`
-  let required_asset_collections_value =
-    get_single_value_from_pairs(bg_datum_extra, "required_asset_collections")
-  let required_asset_attributes_value =
-    get_single_value_from_pairs(bg_datum_extra, "required_asset_attributes")
-  let required_asset_displayed_value =
-    get_single_value_from_pairs(bg_datum_extra, "required_asset_displayed")
-  when required_asset_collections_value is {
-    None ->
-      // if `required_asset_collections` is not set, there is not bg asset constraints
-      True
-    Some(required_asset_collections_data) -> {
-      // `required_asset_collections` must be List<ByteArray> when it is set.
-      // This is a list of Asset Ids
-      expect required_asset_collections: List<ByteArray> =
-        required_asset_collections_data
-
-      // there must be user_output
-      expect Some(user_output) = user_output_opt
-
-      // for any of those assets
-      required_asset_collections
-        |> list.any(
-            fn(required_asset_id) -> Bool {
-              // check user_output has required asset
-              let user_output_has_required_asset =
-                check_output_has_asset_by_asset_id(
-                  user_output,
-                  required_asset_id,
-                  1,
-                )
-
-              // check required_asset_attributes
-              let required_asset_attributes_met =
-                when required_asset_attributes_value is {
-                  None -> True
-                  Some(required_asset_attributes_data) -> {
-                    expect required_asset_attributes: List<ByteArray> =
-                      required_asset_attributes_data
-                    check_required_asset_attributes(
-                      required_asset_id,
-                      required_asset_attributes,
-                      reference_inputs,
-                    )
-                  }
-                }
-
-              // check `required_asset_displayed`
-              let must_display =
-                when required_asset_displayed_value is {
-                  None -> True
-                  Some(required_asset_displayed_data) -> {
-                    expect required_asset_displayed: Int =
-                      required_asset_displayed_data
-                    convert_int_to_bool(required_asset_displayed)
-                  }
-                }
-              let required_asset_displayed_met =
-                when must_display is {
-                  True -> {
-                    // pfp_asset must be required_asset OR current handle (being personalized) is required_asset
-                    let is_pfp_asset_required_asset =
-                      pfp_asset_id_opt == Some(required_asset_id)
-                    let user_handle_asset_name =
-                      bytearray.concat(prefix_222, handle_name)
-                    let user_handle_asset_id =
-                      bytearray.concat(policy_id, user_handle_asset_name)
-                    let is_handle_required_asset =
-                      user_handle_asset_id == required_asset_id
-                    let required_asset_displayed_met = or {
-                        is_pfp_asset_required_asset,
-                        is_handle_required_asset,
-                      }
-                    required_asset_displayed_met
-                  }
-                  False ->
-                    // we don't check when flag is False
-                    True
-                }
-              let required_asset_met = and {
-                  user_output_has_required_asset,
-                  required_asset_attributes_met,
-                  required_asset_displayed_met,
-                }
-              required_asset_met
-            },
-          )
-    }
-  }
-}
-
-// This function checks 
-// required_asset's datum (required_asset is User Token or RFT, so there must be reference token in reference inputs)
-// has all required_asset_attributes (List<ByteArray>, each ByteArray is `key:value` in utf8 format)
-// NOTE:
-// `required_asset_id` must be User Token or RFT
 //
-fn check_required_asset_attributes(
-  required_asset_id: ByteArray,
-  required_asset_attributes: List<ByteArray>,
-  reference_inputs: List<Input>,
+pub fn check_fees_are_paid(
+  pz_handle: Handle,
+  settings_v1: PzSettingsV1,
+  treasury_output_opt: Option<Output>,
+  provider_fee_output_opt: Option<Output>,
+  shared_fee_output_opt: Option<Output>,
+  last_edited_time_opt: Option<Int>,
+  transaction_start_time: Int,
 ) -> Bool {
-  let required_asset_datum_opt =
-    find_datum_by_user_asset_id(required_asset_id, reference_inputs)
-  when required_asset_datum_opt is {
-    Some(required_asset_datum) -> {
-      let attributes = get_attributes_from_datum(required_asset_datum)
-      // for all required_asset_attributes
-      required_asset_attributes
-        |> list.all(
-            fn(required_asset_attribute: ByteArray) -> Bool {
-              let (required_key, required_value, attribute_string) =
-                parse_attribute_key_value(required_asset_attribute)
-              let value = get_single_value_from_pairs(attributes, required_key)
-              let attribute_value_match =
-                check_attribute_value_with_data(required_value, value)
-              when attribute_value_match is {
-                True -> True
-                False -> {
-                  trace string.concat(
-                    @"required_asset_attribute not met: ",
-                    attribute_string,
-                  )
-                  False
-                }
-              }
-            },
-          )
-    }
-    None ->
-      // when required_asset is CIP25, we couldn't check required_asset_attributes
-      // we just approve it
-      True
-  }
-}
+  let PzSettingsV1 { grace_period, .. } = settings_v1
 
-// This function checks
-// `value` match with `required_value`
-// when `required_value` is valid Int (in utf8 format), value must be Int
-// when `required_value` is not-empty ByteArray, `value` must be ByteArray with same value
-// when `required_value` is `#""`, `value` must be None or empty ByteArray
-//
-fn check_attribute_value_with_data(
-  required_value: ByteArray,
-  value: Option<Data>,
-) -> Bool {
-  let required_int_valude_opt = int.from_utf8(required_value)
-
-  when required_int_valude_opt is {
-    Some(required_int_value) -> value == Some(i_data(required_int_value))
-    None -> {
-      let is_empty_value = bytearray.length(required_value) == 0
-      when is_empty_value is {
-        True -> or {
-            value == None,
-            value == Some(b_data("")),
-          }
-        False -> value == Some(b_data(required_value))
-      }
+  // check tx is in grace period
+  let is_in_grace_period =
+    when last_edited_time_opt is {
+      Some(last_edited_time) ->
+        transaction_start_time < last_edited_time + grace_period
+      None -> False
     }
+  if is_in_grace_period {
+    trace @"in grace period"
+    True
+  } else {
+    todo
   }
 }
