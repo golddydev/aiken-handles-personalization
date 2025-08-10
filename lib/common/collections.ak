@@ -30,6 +30,21 @@ pub fn get_single_int_value_from_pairs(
   }
 }
 
+pub fn get_first_int_value_from_pairs(
+  data: Pairs<Data, Data>,
+  key: ByteArray,
+) -> Option<Int> {
+  let value_opt = pairs.get_first(data, b_data(key))
+  when value_opt is {
+    None -> None
+    Some(value) -> {
+      trace string.concat(cbor.diagnostic(key), @"as first Int")
+      expect value: Int = value
+      Some(value)
+    }
+  }
+}
+
 pub fn get_single_bytearray_value_from_pairs(
   data: Pairs<Data, Data>,
   key: ByteArray,

@@ -5,18 +5,20 @@ use common/utils.{check_transaction_is_valid_after_finite_time} as common_utils
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
 use validations/pz_governor/personalize.{
-  check_fees_are_paid, check_new_datum_reset, check_new_extra,
-  check_new_metadata, parse_outputs,
+  check_fees_are_paid, check_new_extra, check_new_metadata, parse_outputs,
 }
 use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{
-  check_pz_output, find_pz_utxo, parse_pz_asset_name,
+  check_pz_output, check_user_output, find_pz_utxo, parse_pz_asset_name,
 }
 
 // Validation:
 //
 // CAUTION: 
 // This function assumes that `policy_ids` from `PzSettingsV1` are always valid ones.
+//
+// NOTE:
+// `asset_class` is Reference Handle or Virtual Subhandle Asset Class
 //
 pub fn can_personalize(
   transaction: Transaction,
@@ -64,7 +66,7 @@ pub fn can_personalize(
   // parse pz_asset_name
   let (pz_handle, handle_name) = parse_pz_asset_name(asset_name)
 
-  // `pz_output` must be valid
+  // check `pz_output` is valid
   let new_datum = check_pz_output(pz_output, pz_utxo)
   let CIP68Datum {
     metadata: new_metadata,
@@ -72,6 +74,10 @@ pub fn can_personalize(
     extra: new_extra_data,
   } = new_datum
   expect new_extra: Pairs<Data, Data> = new_extra_data
+
+  // check `user_output` is valid
+  let user_output_valid = check_user_output(user_output, pz_handle)
+  expect user_output_valid
 
   // `new_version` must be >= 0
   let is_version_valid = new_version >= 0 && new_version >= old_version
@@ -89,9 +95,6 @@ pub fn can_personalize(
       extra_signatories,
       transaction_start_time,
     )
-
-  // check `is_new_datum_reset`
-  let is_new_datum_reset = check_new_datum_reset(new_extra, new_image)
 
   // check designer settings are valid.
   // let designer_settings_valid = check_designer_settings(new_extra, old_extra)

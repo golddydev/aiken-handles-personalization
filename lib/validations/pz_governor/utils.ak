@@ -7,7 +7,9 @@ use common/assets.{AssetClass}
 use common/cip68.{
   CIP68Datum, check_asset_name_is_reference_asset_name,
   check_asset_name_is_virtual_subhandle_asset_name, prefix_000, prefix_100,
+  prefix_222,
 }
+use common/utils.{check_output_has_asset_by_asset_id} as common_utils
 use handles/types.{Handle,
   NFTHandle, NFTSubhandle, VirtualSubhandle} as handles_types
 use handles/utils.{parse_handle_name}
@@ -104,6 +106,36 @@ pub fn check_pz_output(pz_output: Output, pz_utxo: Output) -> CIP68Datum {
   expect cip68_datum: CIP68Datum = new_datum
 
   cip68_datum
+}
+
+// This function checks
+// `user_output` must have corresponding user asset.
+//
+// NOTE:
+// Virtual Subhandle doesn't have User Asset.
+//
+pub fn check_user_output(user_output: Output, handle: Handle) -> Bool {
+  let user_asset_name_opt =
+    when handle is {
+      NFTHandle(handle_name) -> {
+        let user_asset_name = bytearray.concat(prefix_222, handle_name)
+        Some(user_asset_name)
+      }
+      NFTSubhandle(handle_name, _, _) -> {
+        let user_asset_name = bytearray.concat(prefix_222, handle_name)
+        Some(user_asset_name)
+      }
+      VirtualSubhandle(_, _, _) -> None
+    }
+
+  when user_asset_name_opt is {
+    Some(user_asset_name) -> {
+      let has_user_asset =
+        check_output_has_asset_by_asset_id(user_output, user_asset_name, 1)
+      has_user_asset
+    }
+    None -> True
+  }
 }
 
 // This function
