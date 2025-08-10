@@ -7,9 +7,11 @@ use handles/types.{Handle, NFTHandle, NFTSubhandle, VirtualSubhandle}
 // This function
 // parse Ref Handle OR Virtual Subhandle's asset_name as Handle
 // 
-// Returns: Handle and handle_name
+// Returns: Handle and handle_name and is_subhandle
 //
-pub fn parse_handle_asset_name(asset_name: AssetName) -> (Handle, ByteArray) {
+pub fn parse_handle_asset_name(
+  asset_name: AssetName,
+) -> (Handle, ByteArray, Bool) {
   let prefix = bytearray.take(asset_name, 4)
   let handle_name = bytearray.drop(asset_name, 4)
   let (root_handle_name, is_subhandle, subhandle_name) =
@@ -18,9 +20,13 @@ pub fn parse_handle_asset_name(asset_name: AssetName) -> (Handle, ByteArray) {
   if prefix == prefix_100 {
     // NFTHandle or NFTSubhandle
     if is_subhandle {
-      (NFTSubhandle(handle_name, root_handle_name, subhandle_name), handle_name)
+      (
+        NFTSubhandle(handle_name, root_handle_name, subhandle_name),
+        handle_name,
+        True,
+      )
     } else {
-      (NFTHandle(handle_name), handle_name)
+      (NFTHandle(handle_name), handle_name, False)
     }
   } else if prefix == prefix_000 {
     // VirtualSubhandle
@@ -29,6 +35,7 @@ pub fn parse_handle_asset_name(asset_name: AssetName) -> (Handle, ByteArray) {
     (
       VirtualSubhandle(handle_name, root_handle_name, subhandle_name),
       handle_name,
+      True,
     )
   } else {
     fail @"invalid asset name label for pz asset"

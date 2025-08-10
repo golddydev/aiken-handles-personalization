@@ -4,12 +4,14 @@ use common/cip68.{CIP68Datum}
 use common/utils.{check_transaction_is_valid_after_finite_time} as common_utils
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
+use handles/utils.{parse_handle_asset_name} as handle_utils
+use subhandle/utils.{check_pz_enabled} as subhandle_utils
 use validations/pz_governor/personalize.{
   check_fees_are_paid, check_new_extra, check_new_metadata, parse_outputs,
 }
 use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{
-  check_pz_output, check_user_output, find_pz_utxo, parse_pz_asset_name,
+  check_pz_output, check_user_output, find_pz_utxo,
 }
 
 // Validation:
@@ -33,7 +35,7 @@ pub fn can_personalize(
     extra_signatories,
     ..
   } = transaction
-  let (policy_id, asset_name) = asset_class
+  let (_, asset_name) = asset_class
 
   // transaction starts after valid time
   let transaction_start_time =
@@ -43,7 +45,7 @@ pub fn can_personalize(
   let PzSettings { data: settings_data, .. } =
     find_pz_settings(reference_inputs)
   expect settings_v1: PzSettingsV1 = settings_data
-  let PzSettingsV1 { policy_ids, settings_script_hash, .. } = settings_v1
+  let PzSettingsV1 { policy_ids, .. } = settings_v1
 
   // must have valid `pz_utxo`
   let (pz_utxo, old_datum) = find_pz_utxo(inputs, policy_ids, asset_class)
@@ -64,7 +66,8 @@ pub fn can_personalize(
   ) = parse_outputs(outputs, pz_indexes)
 
   // parse pz_asset_name
-  let (pz_handle, handle_name) = parse_pz_asset_name(asset_name)
+  let (pz_handle, handle_name, is_subhandle) =
+    parse_handle_asset_name(asset_name)
 
   // check `pz_output` is valid
   let new_datum = check_pz_output(pz_output, pz_utxo)
@@ -84,8 +87,8 @@ pub fn can_personalize(
   expect is_version_valid
 
   // `new_metadata` must be valid
-  let (new_image, new_media_type) =
-    check_new_metadata(new_metadata, old_metadata)
+  let new_metadata_valid = check_new_metadata(new_metadata, old_metadata)
+  expect new_metadata_valid
 
   // `new extra` must be valid
   let old_last_edited_time_opt =
@@ -96,22 +99,28 @@ pub fn can_personalize(
       transaction_start_time,
     )
 
-  // check designer settings are valid.
-  // let designer_settings_valid = check_designer_settings(new_extra, old_extra)
+  // check pz is enabled
+  let (pz_enabled, payment_address_opt) =
+    check_pz_enabled(pz_handle, policy_ids, reference_inputs)
+  expect pz_enabled
+
   // check fees are paid
   // fees are for designer settings update.
-  let fee_paid =
+  let fees_are_correctly_paid =
     check_fees_are_paid(
-      pz_handle,
+      handle_name,
+      is_subhandle,
       settings_v1,
+      payment_address_opt,
       treasury_output_opt,
       provider_fee_output_opt,
       shared_fee_output_opt,
       old_last_edited_time_opt,
       transaction_start_time,
     )
+  expect fees_are_correctly_paid
 
   // TODO:
   // check designer settings
-  todo
+  True
 }

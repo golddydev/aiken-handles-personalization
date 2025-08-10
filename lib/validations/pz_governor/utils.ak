@@ -2,17 +2,14 @@ use aiken/bytearray
 use aiken/dict
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/value.{AssetName, PolicyId, Value}
+use aiken/transaction/value.{PolicyId, Value}
 use common/assets.{AssetClass}
 use common/cip68.{
   CIP68Datum, check_asset_name_is_reference_asset_name,
-  check_asset_name_is_virtual_subhandle_asset_name, prefix_000, prefix_100,
-  prefix_222,
+  check_asset_name_is_virtual_subhandle_asset_name, prefix_222,
 }
-use common/utils.{check_output_has_asset_by_asset_id} as common_utils
-use handles/types.{Handle,
-  NFTHandle, NFTSubhandle, VirtualSubhandle} as handles_types
-use handles/utils.{parse_handle_name}
+use common/utils.{check_output_has_asset_by_asset_id}
+use handles/types.{Handle, NFTHandle, NFTSubhandle, VirtualSubhandle}
 
 // - Finds the personalizing UTxO `pz_utxo`
 //   UTxO with Reference Handle or Virtual Subhandle Asset.
@@ -135,36 +132,5 @@ pub fn check_user_output(user_output: Output, handle: Handle) -> Bool {
       has_user_asset
     }
     None -> True
-  }
-}
-
-// This function
-// parse ref Handle OR Virtual Subhandle's asset_name as Handle
-// 
-// Returns: Handle and handle_name
-//
-pub fn parse_pz_asset_name(asset_name: AssetName) -> (Handle, ByteArray) {
-  let prefix = bytearray.take(asset_name, 4)
-  let handle_name = bytearray.drop(asset_name, 4)
-  let (root_handle_name, is_subhandle, subhandle_name) =
-    parse_handle_name(handle_name)
-
-  if prefix == prefix_100 {
-    // NFTHandle or NFTSubhandle
-    if is_subhandle {
-      (NFTSubhandle(handle_name, root_handle_name, subhandle_name), handle_name)
-    } else {
-      (NFTHandle(handle_name), handle_name)
-    }
-  } else if prefix == prefix_000 {
-    // VirtualSubhandle
-    expect is_subhandle
-
-    (
-      VirtualSubhandle(handle_name, root_handle_name, subhandle_name),
-      handle_name,
-    )
-  } else {
-    fail @"invalid asset name label for pz asset"
   }
 }

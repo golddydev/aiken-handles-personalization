@@ -3,7 +3,9 @@ use aiken/cbor
 use aiken/list
 use aiken/pairs
 use aiken/string
-use aiken/transaction.{Output}
+use aiken/transaction.{InlineDatum, Output}
+use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction/value
 use common/collections.{
   get_first_int_value_from_pairs, get_single_bytearray_value_from_pairs,
   get_single_int_value_from_pairs, get_single_value_from_pairs,
@@ -11,7 +13,6 @@ use common/collections.{
 use common/hashes.{VerificationKeyHash}
 use configs/settings_v1.{PzSettingsV1}
 use handles/constants.{agreed_terms_url}
-use handles/types.{Handle} as handles_types
 use validations/pz_governor/types.{PzIndexes}
 
 // This function parses outputs using `pz_indexes`
@@ -48,19 +49,19 @@ pub fn parse_outputs(
 // - for all keys in `old_metadata` other than `image` and `mediaType`,
 //   there must be a corresponding key in `new_metadata` with same value.
 //
-// returns: (new_image, new_media_type)
+// returns: Bool
 //
 pub fn check_new_metadata(
   new_metadata: Pairs<Data, Data>,
   old_metadata: Pairs<Data, Data>,
-) -> (ByteArray, ByteArray) {
+) -> Bool {
   // immutable values
   let new_image_opt =
     get_single_bytearray_value_from_pairs(new_metadata, "image")
   let new_media_type_opt =
     get_single_bytearray_value_from_pairs(new_metadata, "mediaType")
-  expect Some(new_image) = new_image_opt
-  expect Some(new_media_type) = new_media_type_opt
+  expect Some(_) = new_image_opt
+  expect Some(_) = new_media_type_opt
 
   let immutables_stay_same =
     old_metadata
@@ -86,7 +87,7 @@ pub fn check_new_metadata(
         )
   expect immutables_stay_same
 
-  (new_image, new_media_type)
+  True
 }
 
 // - transaction must be signed by `validated_by` if it is set as single value.
@@ -156,20 +157,33 @@ pub fn check_new_extra(
 }
 
 // This function checks
-// corresponding fees are paid correctly
+// corresponding fees are paid correctly if `grace_period` is over.
+// - `treasury_fee` must be paid
+// - `provider_fee` must be paid
+// - `shared_fee` must be paid if `is_subhandle` is True
+//
 // returns: Bool
 //
-//
 pub fn check_fees_are_paid(
-  pz_handle: Handle,
+  handle_name: ByteArray,
+  is_subhandle: Bool,
   settings_v1: PzSettingsV1,
+  payment_address_opt: Option<Address>,
   treasury_output_opt: Option<Output>,
   provider_fee_output_opt: Option<Output>,
   shared_fee_output_opt: Option<Output>,
   last_edited_time_opt: Option<Int>,
   transaction_start_time: Int,
 ) -> Bool {
-  let PzSettingsV1 { grace_period, .. } = settings_v1
+  let PzSettingsV1 {
+    provider_script_hashes,
+    treasury_script_hash,
+    treasury_fee,
+    pz_min_fee,
+    grace_period,
+    subhandle_share_percent,
+    ..
+  } = settings_v1
 
   // check tx is in grace period
   let is_in_grace_period =
@@ -182,6 +196,79 @@ pub fn check_fees_are_paid(
     trace @"in grace period"
     True
   } else {
-    todo
+    // calculate provider and shared fee
+    let shared_fee =
+      if is_subhandle {
+        pz_min_fee * subhandle_share_percent / 100
+      } else {
+        0
+      }
+    let provider_fee = pz_min_fee - shared_fee
+
+    // treasury fee must be paid
+    expect Some(treasury_output) = treasury_output_opt
+    let is_treasury_fee_paid =
+      check_fee_output_is_valid(
+        treasury_output,
+        fn(address: Address) -> Bool {
+          address.payment_credential == ScriptCredential(treasury_script_hash)
+        },
+        treasury_fee,
+        handle_name,
+      )
+    expect is_treasury_fee_paid
+
+    // pz provider fee must be paid
+    expect Some(provider_fee_output) = provider_fee_output_opt
+    let is_provider_fee_paid =
+      check_fee_output_is_valid(
+        provider_fee_output,
+        fn(address: Address) -> Bool {
+          list.any(
+            provider_script_hashes,
+            fn(script_hash) -> Bool {
+              address.payment_credential == ScriptCredential(script_hash)
+            },
+          )
+        },
+        provider_fee,
+        handle_name,
+      )
+    expect is_provider_fee_paid
+
+    // shared fee must be paid
+    let is_shared_fee_paid =
+      if is_subhandle {
+        expect Some(shared_fee_output) = shared_fee_output_opt
+        expect Some(payment_address) = payment_address_opt
+        check_fee_output_is_valid(
+          shared_fee_output,
+          fn(address: Address) -> Bool { address == payment_address },
+          shared_fee,
+          handle_name,
+        )
+      } else {
+        // shared fee is not paid for non-subhandle
+        True
+      }
+    expect is_shared_fee_paid
+
+    True
+  }
+}
+
+fn check_fee_output_is_valid(
+  fee_output: Output,
+  check_address_is_valid: fn(Address) -> Bool,
+  fee: Int,
+  handle_name: ByteArray,
+) -> Bool {
+  let Output { address, datum, value: v, reference_script } = fee_output
+
+  and {
+    check_address_is_valid(address),
+    datum == InlineDatum(handle_name),
+    value.lovelace_of(v) >= fee,
+    reference_script == None,
   }
 }
