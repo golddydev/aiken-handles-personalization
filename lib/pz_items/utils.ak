@@ -56,6 +56,7 @@ pub fn combine_policy_id_pz_flags_and_asset_id_pz_flags(
 ) -> PzFlags {
   let (policy_id_nsfw_bool, policy_id_trial_bool) =
     parse_pz_flags(policy_id_pz_flags)
+
   when asset_id_pz_flags_opt is {
     Some(asset_id_pz_flags) -> {
       let (asset_id_nsfw_bool, asset_id_trial_bool) =

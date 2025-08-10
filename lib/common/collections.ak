@@ -1,7 +1,9 @@
 use aiken/builtin.{b_data}
 use aiken/cbor
+use aiken/option
 use aiken/pairs
 use aiken/string
+use common/bool.{convert_int_to_bool}
 
 pub fn get_single_value_from_pairs(
   data: Pairs<Data, Data>,
@@ -28,6 +30,15 @@ pub fn get_single_int_value_from_pairs(
       Some(single_value)
     }
   }
+}
+
+pub fn get_single_int_as_bool_value_from_pairs(
+  data: Pairs<Data, Data>,
+  key: ByteArray,
+) -> Bool {
+  get_single_int_value_from_pairs(data, key)
+    |> option.map(convert_int_to_bool)
+    |> option.or_else(False)
 }
 
 pub fn get_first_int_value_from_pairs(

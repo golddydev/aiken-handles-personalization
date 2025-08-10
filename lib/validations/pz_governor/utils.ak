@@ -1,6 +1,7 @@
 use aiken/bytearray
 use aiken/dict
 use aiken/list
+use aiken/option
 use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/value.{PolicyId, Value}
 use common/assets.{AssetClass}
@@ -125,12 +126,13 @@ pub fn check_user_output(user_output: Output, handle: Handle) -> Bool {
       VirtualSubhandle(_, _, _) -> None
     }
 
-  when user_asset_name_opt is {
-    Some(user_asset_name) -> {
-      let has_user_asset =
-        check_output_has_asset_by_asset_id(user_output, user_asset_name, 1)
-      has_user_asset
-    }
-    None -> True
-  }
+  user_asset_name_opt
+    |> option.map(
+        fn(user_asset_name) -> Bool {
+          let has_user_asset =
+            check_output_has_asset_by_asset_id(user_output, user_asset_name, 1)
+          has_user_asset
+        },
+      )
+    |> option.or_else(True)
 }

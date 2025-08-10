@@ -1,18 +1,23 @@
 use aiken/builtin.{b_data}
 use aiken/cbor
 use aiken/list
+use aiken/option
 use aiken/pairs
 use aiken/string
-use aiken/transaction.{InlineDatum, Output}
+use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/credential.{Address, ScriptCredential}
-use aiken/transaction/value
+use aiken/transaction/value.{PolicyId}
+use common/address.{convert_address_from_bytearray}
 use common/collections.{
-  get_first_int_value_from_pairs, get_single_bytearray_value_from_pairs,
-  get_single_int_value_from_pairs, get_single_value_from_pairs,
+  get_single_bytearray_value_from_pairs, get_single_int_value_from_pairs,
+  get_single_value_from_pairs,
 }
 use common/hashes.{VerificationKeyHash}
 use configs/settings_v1.{PzSettingsV1}
 use handles/constants.{agreed_terms_url}
+use handles/types.{Handle,
+  NFTHandle, NFTSubhandle, VirtualSubhandle} as handles_types
+use subhandle/utils.{find_owner_settings}
 use validations/pz_governor/types.{PzIndexes}
 
 // This function parses outputs using `pz_indexes`
@@ -95,22 +100,21 @@ pub fn check_new_metadata(
 // - `agreed_terms` must be same as `agreed_terms_url`.
 // - `last_edited_time` must be same as transaction's start time.
 //
-// returns: Option<Int>
+// returns: Bool
 //
 pub fn check_new_extra(
   new_extra: Pairs<Data, Data>,
   old_extra: Pairs<Data, Data>,
   extra_signatories: List<VerificationKeyHash>,
   transaction_start_time: Int,
-) -> Option<Int> {
+) -> Bool {
   // tansaction must be signed by `validated_by` if it is set as single value.
-  let validated_by_opt =
-    get_single_bytearray_value_from_pairs(new_extra, "validated_by")
   let is_tx_signed_by_validated_by =
-    when validated_by_opt is {
-      None -> True
-      Some(validated_by) -> list.has(extra_signatories, validated_by)
-    }
+    get_single_bytearray_value_from_pairs(new_extra, "validated_by")
+      |> option.map(
+          fn(validated_by) -> Bool { list.has(extra_signatories, validated_by) },
+        )
+      |> option.or_else(True)
   expect is_tx_signed_by_validated_by
 
   // - `standard_image`, `standard_image_hash`, `original_address` must be same as `old_extra`. (as single value or None)
@@ -149,11 +153,62 @@ pub fn check_new_extra(
   let is_last_edited_time_valid = last_edited_time == transaction_start_time
   expect is_last_edited_time_valid
 
-  // get `last_edited_time` from old datum's extra
-  let old_last_edited_time_opt =
-    get_first_int_value_from_pairs(old_extra, "last_edited_time")
+  True
+}
 
-  old_last_edited_time_opt
+// This function checks
+// personalization is enabled and get payment_address for Subhandle.
+// check pz_enabled is set to true
+// - nft_settings for NFTSubHandle
+// - virtual_settings for VirtualSubHandle
+// check new_pz_enabled is set to correct value
+//
+// Returns:
+// - pz_enabled: Bool
+// - payment_address: Option<Address>
+//
+pub fn check_pz_enabled(
+  new_pz_enabled: Bool,
+  old_pz_enabled: Bool,
+  handle: Handle,
+  policy_ids: List<PolicyId>,
+  reference_inputs: List<Input>,
+) -> (Bool, Option<Address>) {
+  let sub_handle_settings_opt =
+    when handle is {
+      NFTHandle(_) -> None
+      NFTSubhandle(_, root_handle_name, _) -> {
+        let owner_settings =
+          find_owner_settings(policy_ids, reference_inputs, root_handle_name)
+        let (nft_settings, _, _, _, _, _, _, payment_address_hex) =
+          owner_settings
+        Some((nft_settings, payment_address_hex))
+      }
+      VirtualSubhandle(_, root_handle_name, _) -> {
+        let owner_settings =
+          find_owner_settings(policy_ids, reference_inputs, root_handle_name)
+        let (_, virtual_settings, _, _, _, _, _, payment_address_hex) =
+          owner_settings
+        Some((virtual_settings, payment_address_hex))
+      }
+    }
+
+  when sub_handle_settings_opt is {
+    None -> (True, None)
+    Some((sub_handle_settings, payment_address_hex)) -> {
+      let (_, pz_enabled, _, _, _) = sub_handle_settings
+      let root_pz_enabled = pz_enabled == 1
+      let payment_address = convert_address_from_bytearray(payment_address_hex)
+
+      let new_pz_enabled_valid = or {
+          old_pz_enabled,
+          new_pz_enabled == root_pz_enabled,
+        }
+      expect new_pz_enabled_valid
+
+      (old_pz_enabled || root_pz_enabled, Some(payment_address))
+    }
+  }
 }
 
 // This function checks
@@ -187,11 +242,13 @@ pub fn check_fees_are_paid(
 
   // check tx is in grace period
   let is_in_grace_period =
-    when last_edited_time_opt is {
-      Some(last_edited_time) ->
-        transaction_start_time < last_edited_time + grace_period
-      None -> False
-    }
+    last_edited_time_opt
+      |> option.map(
+          fn(last_edited_time) -> Bool {
+            transaction_start_time < last_edited_time + grace_period
+          },
+        )
+      |> option.or_else(False)
   if is_in_grace_period {
     trace @"in grace period"
     True

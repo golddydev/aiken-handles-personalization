@@ -9,14 +9,13 @@ use aiken/transaction/value.{PolicyId}
 use common/assets.{AssetClass}
 use common/cip68.{CIP68Datum, prefix_222}
 use common/collections.{
-  get_single_bytearray_value_from_pairs, get_single_int_value_from_pairs,
+  get_single_bytearray_value_from_pairs, get_single_int_as_bool_value_from_pairs,
   get_single_list_bytearray_value_from_pairs, get_single_value_from_pairs,
 }
 use common/hashes.{VerificationKeyHash}
 use common/utils.{
-  check_output_has_asset_by_asset_id, convert_int_to_bool,
-  find_datum_by_user_asset_id, get_attributes_from_datum,
-  parse_attribute_key_value,
+  check_output_has_asset_by_asset_id, find_datum_by_user_asset_id,
+  get_attributes_from_datum, parse_attribute_key_value,
 } as common_utils
 
 // This function checks
@@ -62,16 +61,16 @@ pub fn get_bg_asset_datum(
   let CIP68Datum { extra, .. } = datum
   expect extra: Pairs<Data, Data> = extra
 
-  let bg_asset_id_opt = get_single_bytearray_value_from_pairs(extra, "bg_asset")
-  when bg_asset_id_opt is {
-    None -> None
-    Some(bg_asset_id) -> {
-      // find CIP68Datum for bg_asset_id
-      let bg_datum_opt =
-        find_datum_by_user_asset_id(bg_asset_id, reference_inputs)
-      bg_datum_opt
-    }
-  }
+  get_single_bytearray_value_from_pairs(extra, "bg_asset")
+    |> option.map(
+        fn(bg_asset_id) -> Option<CIP68Datum> {
+          // find CIP68Datum for bg_asset_id
+          let bg_datum_opt =
+            find_datum_by_user_asset_id(bg_asset_id, reference_inputs)
+          bg_datum_opt
+        },
+      )
+    |> option.flatten
 }
 
 // this function checks bg asset's constraints are met
@@ -91,14 +90,14 @@ pub fn check_bg_constraints_are_met(
   expect bg_datum_extra: Pairs<Data, Data> = extra
 
   // check `required_signature` from `bg_datum`'s extra
-  let required_signature_opt =
-    get_single_bytearray_value_from_pairs(bg_datum_extra, "required_signature")
   let is_tx_signed_by_required_signature =
-    when required_signature_opt is {
-      None -> True
-      Some(required_signature) ->
-        list.has(extra_signatories, required_signature)
-    }
+    get_single_bytearray_value_from_pairs(bg_datum_extra, "required_signature")
+      |> option.map(
+          fn(required_signature) -> Bool {
+            list.has(extra_signatories, required_signature)
+          },
+        )
+      |> option.or_else(True)
   expect is_tx_signed_by_required_signature
 
   // check `require_asset_collections`, `require_asset_attributes` and `require_asset_displayed`
@@ -114,9 +113,10 @@ pub fn check_bg_constraints_are_met(
     )
 
   let required_asset_displayed =
-    get_single_int_value_from_pairs(bg_datum_extra, "required_asset_displayed")
-      |> option.map(convert_int_to_bool)
-      |> option.or_else(False)
+    get_single_int_as_bool_value_from_pairs(
+      bg_datum_extra,
+      "required_asset_displayed",
+    )
 
   when required_asset_collections_opt is {
     None ->
@@ -134,15 +134,17 @@ pub fn check_bg_constraints_are_met(
                 ),
                 //
                 // check required_asset_attributes
-                when required_asset_attributes_opt is {
-                  None -> True
-                  Some(required_asset_attributes) ->
-                    check_required_asset_attributes(
-                      required_asset_id,
-                      required_asset_attributes,
-                      reference_inputs,
+                required_asset_attributes_opt
+                  |> option.map(
+                      fn(required_asset_attributes) -> Bool {
+                        check_required_asset_attributes(
+                          required_asset_id,
+                          required_asset_attributes,
+                          reference_inputs,
+                        )
+                      },
                     )
-                },
+                  |> option.or_else(True),
                 //
                 // check `required_asset_displayed`
                 when required_asset_displayed is {
