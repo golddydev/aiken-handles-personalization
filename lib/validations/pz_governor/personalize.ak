@@ -1,47 +1,40 @@
 use aiken/builtin.{b_data, i_data}
 use aiken/cbor
 use aiken/list
-use aiken/merkle_patricia_forestry as mpt
 use aiken/pairs
 use aiken/string
-use aiken/transaction.{Input, Output}
-use common/cip68.{CIP68Datum, get_image_from_cip68_datum}
+use aiken/transaction.{Output}
 use common/collections.{get_single_value_from_pairs}
 use common/hashes.{VerificationKeyHash}
-use common/utils.{
-  check_output_has_asset_by_asset_id, find_datum_by_user_asset_id,
-} as common_utils
 use configs/settings_v1.{PzSettingsV1}
 use handles/constants.{agreed_terms_url}
 use handles/types.{Handle} as handles_types
-use pz_items/types.{PzFlags} as pz_items_types
-use pz_items/utils.{combine_two_pz_flags, default_pz_flags, get_pz_asset_flags}
-use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
+use validations/pz_governor/types.{PzIndexes}
 
+// This function parses outputs using `pz_indexes`
+// - first output must be `pz_output` (ref_output)
+// - second output must be `user_output`
 // - retrieve relevant outputs using pz_indexes
-//   ref_output must be not None
-pub fn parse_pz_indexes(
+//
+pub fn parse_outputs(
   outputs: List<Output>,
   pz_indexes: PzIndexes,
-) -> (Output, Option<Output>, Option<Output>, Option<Output>, Option<Output>) {
+) -> (Output, Output, Option<Output>, Option<Output>, Option<Output>) {
+  expect [pz_output, user_output, ..] = outputs
+
   let PzIndexes {
-    ref_output_index,
-    user_output_index,
     treasury_output_index,
     provider_fee_output_index,
     shared_fee_output_index,
   } = pz_indexes
 
-  let ref_output_opt = list.at(outputs, ref_output_index)
-  let user_output_opt = list.at(outputs, user_output_index)
   let treasury_output_opt = list.at(outputs, treasury_output_index)
   let provider_fee_output_opt = list.at(outputs, provider_fee_output_index)
   let shared_fee_output_opt = list.at(outputs, shared_fee_output_index)
 
-  expect Some(ref_output) = ref_output_opt
   (
-    ref_output,
-    user_output_opt,
+    pz_output,
+    user_output,
     treasury_output_opt,
     provider_fee_output_opt,
     shared_fee_output_opt,
@@ -217,134 +210,6 @@ pub fn check_new_datum_reset(
       Some(i_data(0)) == new_trial_value,
     }
   is_new_datum_reset
-}
-
-// This Function checks
-// - bg_asset and pfp_asset's PzFlags from Policies MPT and Beta Assets MPT
-// - bg_asset and pfp_asset must be user token or RFT
-// - bg_image and pfp_image must be same as bg_asset and pfp_asset's datum's image
-// - user_output must have bg_asset and pfp_asset if they are set.
-//
-// returns: (PzFlags, Option<CIP68Datum>, Option<ByteArray>, Option<ByteArray>)
-// PzFlags, Bg Datum, bg_asset_id_opt, pfp_asset_id_opt
-//
-pub fn check_pz_assets(
-  extra: Pairs<Data, Data>,
-  policies_mpt: mpt.MerklePatriciaForestry,
-  beta_assets_mpt: mpt.MerklePatriciaForestry,
-  pz_assets_proofs: PzAssetsProofs,
-  user_output_opt: Option<Output>,
-  reference_inputs: List<Input>,
-) -> (PzFlags, Option<CIP68Datum>, Option<ByteArray>, Option<ByteArray>) {
-  let (bg_asset_proofs_opt, pfp_asset_proofs_opt) = pz_assets_proofs
-
-  let bg_image_data_opt = get_single_value_from_pairs(extra, "bg_image")
-  let bg_asset_data_opt = get_single_value_from_pairs(extra, "bg_asset")
-  let pfp_image_data_opt = get_single_value_from_pairs(extra, "pfp_image")
-  let pfp_asset_data_opt = get_single_value_from_pairs(extra, "pfp_asset")
-
-  // get bg asset's PzFlags
-  let (bg_asset_pz_flags, bg_datum_opt, bg_asset_id_opt) =
-    when bg_image_data_opt is {
-      Some(bg_image_data) -> {
-        expect bg_image: ByteArray = bg_image_data
-
-        // if bg_image is set then bg_asset must be set
-        expect Some(bg_asset_id_data) = bg_asset_data_opt
-        expect bg_asset_id: ByteArray = bg_asset_id_data
-        expect Some(bg_asset_proofs) = bg_asset_proofs_opt
-
-        let bg_asset_pz_flags =
-          get_pz_asset_flags(
-            bg_asset_id,
-            policies_mpt,
-            beta_assets_mpt,
-            bg_asset_proofs,
-          )
-
-        // check bg_image is same as bg_asset's datum's image
-        let bg_datum_opt =
-          find_datum_by_user_asset_id(bg_asset_id, reference_inputs)
-        let bg_image_match_with_bg_datum =
-          when bg_datum_opt is {
-            Some(bg_datum) -> {
-              // if bg asset is CIP-68, then bg_image must be same as the one from bg_datum
-              let bg_image_from_datum = get_image_from_cip68_datum(bg_datum)
-              bg_image == bg_image_from_datum
-            }
-            None ->
-              // if bg asset is CIP-25, we don't check bg_image is same as bg_datum's image
-              True
-          }
-        expect bg_image_match_with_bg_datum
-
-        // check user_output has bg_asset
-        expect Some(user_output) = user_output_opt
-        let has_bg_asset =
-          check_output_has_asset_by_asset_id(user_output, bg_asset_id, 1)
-        expect has_bg_asset
-
-        (bg_asset_pz_flags, bg_datum_opt, Some(bg_asset_id))
-      }
-      None -> {
-        // if bg_image is NOT set, then bg_asset must be NOT set
-        expect bg_asset_data_opt == None
-        (default_pz_flags(), None, None)
-      }
-    }
-
-  // get pfp asset's PzFlags
-  let (pfp_asset_pz_flags, pfp_asset_id_opt) =
-    when pfp_image_data_opt is {
-      Some(pfp_image_data) -> {
-        expect pfp_image: ByteArray = pfp_image_data
-
-        // if pfp_image is set then pfp_asset must be set
-        expect Some(pfp_asset_id_data) = pfp_asset_data_opt
-        expect pfp_asset_id: ByteArray = pfp_asset_id_data
-        expect Some(pfp_asset_proofs) = pfp_asset_proofs_opt
-
-        let pfp_asset_pz_flags =
-          get_pz_asset_flags(
-            pfp_asset_id,
-            policies_mpt,
-            beta_assets_mpt,
-            pfp_asset_proofs,
-          )
-
-        // check pfp_image is same as pfp_asset's datum's image
-        let pfp_datum_opt =
-          find_datum_by_user_asset_id(pfp_asset_id, reference_inputs)
-        let pfp_image_match_with_pfp_datum =
-          when pfp_datum_opt is {
-            Some(pfp_datum) -> {
-              // if pfp asset is CIP-68, then pfp_image must be same as the one from pfp_datum
-              let pfp_image_from_datum = get_image_from_cip68_datum(pfp_datum)
-              pfp_image == pfp_image_from_datum
-            }
-            None ->
-              // if pfp asset is CIP-25, we don't check pfp_image is same as pfp_datum's image
-              True
-          }
-        expect pfp_image_match_with_pfp_datum
-
-        // check user_output has pfp_asset
-        expect Some(user_output) = user_output_opt
-        let has_pfp_asset =
-          check_output_has_asset_by_asset_id(user_output, pfp_asset_id, 1)
-        expect has_pfp_asset
-
-        (pfp_asset_pz_flags, Some(pfp_asset_id))
-      }
-      None -> {
-        // if pfp_image is NOT set, then pfp_asset must be NOT set
-        expect pfp_asset_data_opt == None
-        (default_pz_flags(), None)
-      }
-    }
-  let pz_flags = combine_two_pz_flags(bg_asset_pz_flags, pfp_asset_pz_flags)
-
-  (pz_flags, bg_datum_opt, bg_asset_id_opt, pfp_asset_id_opt)
 }
 
 // This function checks

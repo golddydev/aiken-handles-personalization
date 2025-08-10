@@ -1,10 +1,10 @@
 use aiken/transaction.{ScriptContext, WithdrawFrom}
 use common/assets.{AssetClass}
-use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
+use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/validation.{can_personalize}
 
 type PzGovernorRedeemer {
-  Personalize(AssetClass, PzIndexes, PzAssetsProofs)
+  Personalize(AssetClass, PzIndexes)
   Reset
   Revoke
 }
@@ -22,8 +22,8 @@ validator {
     expect WithdrawFrom(_) = purpose
 
     when redeemer is {
-      Personalize(asset_class, pz_indexes, pz_assets_proofs) ->
-        can_personalize(transaction, asset_class, pz_indexes, pz_assets_proofs)
+      Personalize(asset_class, pz_indexes) ->
+        can_personalize(transaction, asset_class, pz_indexes)
       Reset -> False
       Revoke -> False
     }

@@ -2,10 +2,8 @@ use aiken/cbor
 use aiken/list
 use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
 use common/assets.{parse_asset_id}
-use common/hashes.{ScriptHash}
 use common/mpf.{not_has}
 use pz_items/types.{
   PzAssetProofs, PzFlags, PzItems, pz_items_asset_name, pz_items_asset_policy_id,
@@ -73,13 +71,9 @@ pub fn combine_policy_id_pz_flags_and_asset_id_pz_flags(
 
 /// Find PzItems from reference inputs.
 /// input's output value must have `pz_items_asset`.
-/// input's output address must be `settings_script_hash`.
 ///
-pub fn find_pz_items(
-  reference_inputs: List<Input>,
-  settings_script_hash: ScriptHash,
-) -> PzItems {
-  let pz_approvers_input_opt =
+pub fn find_pz_items(reference_inputs: List<Input>) -> PzItems {
+  let pz_items_input_opt =
     list.find(
       reference_inputs,
       fn(i) {
@@ -90,16 +84,8 @@ pub fn find_pz_items(
         ) == 1
       },
     )
-  expect Some(pz_approvers_input) = pz_approvers_input_opt
-
-  let Input {
-    output: Output { address: Address { payment_credential, .. }, datum, .. },
-    ..
-  } = pz_approvers_input
-
-  let from_settings_script_hash =
-    payment_credential == ScriptCredential(settings_script_hash)
-  expect from_settings_script_hash
+  expect Some(pz_items_input) = pz_items_input_opt
+  let Input { output: Output { datum, .. }, .. } = pz_items_input
 
   // parse PzItems as InlineDatum
   expect InlineDatum(inline_datum) = datum

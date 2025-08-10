@@ -79,22 +79,22 @@ fn check_value_has_reference_handle_asset_or_virtual_subhandle_asset(
       )
 }
 
-// - `ref_output` must have same address, value as `pz_utxo`
-// - `ref_output` must NOT have reference_script
-// - `ref_output` datum must be in CIP68Datum format.
+// - `pz_output` must have same address, value as `pz_utxo`
+// - `pz_output` must NOT have reference_script
+// - `pz_output` datum must be in CIP68Datum format.
 //
-pub fn check_ref_output(ref_output: Output, pz_utxo: Output) -> CIP68Datum {
+pub fn check_pz_output(pz_output: Output, pz_utxo: Output) -> CIP68Datum {
   let Output {
-    address: ref_output_address,
-    value: ref_output_value,
+    address: pz_output_address,
+    value: pz_output_value,
     datum: new_datum,
     ..
-  } = ref_output
+  } = pz_output
   let Output { address: pz_utxo_address, value: pz_utxo_value, .. } = pz_utxo
 
-  let address_stay_same = ref_output_address == pz_utxo_address
+  let address_stay_same = pz_output_address == pz_utxo_address
   let value_stay_same =
-    value.without_lovelace(ref_output_value) == value.without_lovelace(
+    value.without_lovelace(pz_output_value) == value.without_lovelace(
       pz_utxo_value,
     )
   expect address_stay_same

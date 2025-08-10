@@ -1,7 +1,7 @@
 use aiken/builtin.{index_bytearray}
 use aiken/bytearray
 use aiken/transaction/value.{AssetName}
-use common/collections.{get_single_value_from_pairs}
+use common/collections.{get_single_bytearray_value_from_pairs}
 
 pub type CIP68Datum {
   metadata: Pairs<Data, Data>,
@@ -99,12 +99,9 @@ pub fn check_asset_name_prefix_is_valid(prefix: ByteArray) -> Bool {
 
 pub fn get_image_from_cip68_datum(datum: CIP68Datum) -> ByteArray {
   let CIP68Datum { metadata, .. } = datum
-  let image_data_opt = get_single_value_from_pairs(metadata, "image")
-  when image_data_opt is {
-    Some(image_data) -> {
-      expect image: ByteArray = image_data
-      image
-    }
+  let image_opt = get_single_bytearray_value_from_pairs(metadata, "image")
+  when image_opt is {
+    Some(image) -> image
     None -> fail @"cip68 datum must have image"
   }
 }

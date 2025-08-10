@@ -1,18 +1,16 @@
-use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction.{Transaction}
 use common/assets.{AssetClass}
 use common/cip68.{CIP68Datum}
 use common/utils.{check_transaction_is_valid_after_finite_time} as common_utils
 use configs/settings.{PzSettings, find_pz_settings}
 use configs/settings_v1.{PzSettingsV1}
-use pz_items/utils.{find_pz_items} as pz_items_utils
 use validations/pz_governor/personalize.{
   check_fees_are_paid, check_new_datum_reset, check_new_extra,
-  check_new_metadata, check_pz_assets, parse_pz_indexes,
+  check_new_metadata, parse_outputs,
 }
-use validations/pz_governor/types.{PzAssetsProofs, PzIndexes}
+use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{
-  check_ref_output, find_pz_utxo, parse_pz_asset_name,
+  check_pz_output, find_pz_utxo, parse_pz_asset_name,
 }
 
 // Validation:
@@ -24,7 +22,6 @@ pub fn can_personalize(
   transaction: Transaction,
   asset_class: AssetClass,
   pz_indexes: PzIndexes,
-  pz_assets_proofs: PzAssetsProofs,
 ) -> Bool {
   let Transaction {
     inputs,
@@ -57,18 +54,18 @@ pub fn can_personalize(
 
   // parse pz_indexes
   let (
-    ref_output,
-    user_output_opt,
+    pz_output,
+    user_output,
     treasury_output_opt,
     provider_fee_output_opt,
     shared_fee_output_opt,
-  ) = parse_pz_indexes(outputs, pz_indexes)
+  ) = parse_outputs(outputs, pz_indexes)
 
   // parse pz_asset_name
   let (pz_handle, handle_name) = parse_pz_asset_name(asset_name)
 
-  // `ref_output` must be valid
-  let new_datum = check_ref_output(ref_output, pz_utxo)
+  // `pz_output` must be valid
+  let new_datum = check_pz_output(pz_output, pz_utxo)
   let CIP68Datum {
     metadata: new_metadata,
     version: new_version,
@@ -95,24 +92,6 @@ pub fn can_personalize(
 
   // check `is_new_datum_reset`
   let is_new_datum_reset = check_new_datum_reset(new_extra, new_image)
-
-  // there must be `PzItems` reference input. (input with `PzItems` assets)
-  let pz_items = find_pz_items(reference_inputs, settings_script_hash)
-
-  // build Policies MPT and Beta Assets MPT
-  let policies_mpt = mpt.from_root(pz_items.policies)
-  let beta_assets_mpt = mpt.from_root(pz_items.beta_assets)
-
-  // check pz_assets PzFlags
-  let (pz_flags, bg_datum_opt, bg_asset_id_opt, pfp_asset_id_opt) =
-    check_pz_assets(
-      new_extra,
-      policies_mpt,
-      beta_assets_mpt,
-      pz_assets_proofs,
-      user_output_opt,
-      reference_inputs,
-    )
 
   // check designer settings are valid.
   // let designer_settings_valid = check_designer_settings(new_extra, old_extra)
