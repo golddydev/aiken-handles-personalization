@@ -4,7 +4,7 @@ use aiken/transaction/credential.{
   Address, Inline, ScriptCredential, VerificationKeyCredential,
 }
 
-pub fn convert_address_from_bytearray(addr_hex: ByteArray) -> Address {
+pub fn make_address_from_bytearray(addr_hex: ByteArray) -> Address {
   let header = builtin.index_bytearray(addr_hex, 0)
   let payload = bytearray.drop(addr_hex, 1)
 

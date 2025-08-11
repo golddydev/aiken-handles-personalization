@@ -5,9 +5,11 @@ use aiken/option
 use aiken/pairs
 use aiken/string
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction/credential.{
+  Address, ScriptCredential, VerificationKeyCredential,
+}
 use aiken/transaction/value.{PolicyId}
-use common/address.{convert_address_from_bytearray}
+use common/address.{make_address_from_bytearray}
 use common/collections.{
   get_single_bytearray_value_from_pairs, get_single_int_value_from_pairs,
   get_single_value_from_pairs,
@@ -198,7 +200,7 @@ pub fn check_pz_enabled(
     Some((sub_handle_settings, payment_address_hex)) -> {
       let (_, pz_enabled, _, _, _) = sub_handle_settings
       let root_pz_enabled = pz_enabled == 1
-      let payment_address = convert_address_from_bytearray(payment_address_hex)
+      let payment_address = make_address_from_bytearray(payment_address_hex)
 
       let new_pz_enabled_valid = or {
           old_pz_enabled,
@@ -208,6 +210,86 @@ pub fn check_pz_enabled(
 
       (old_pz_enabled || root_pz_enabled, Some(payment_address))
     }
+  }
+}
+
+// This function checks
+// if resolved_addresses -> ada is set correctly
+// corresponding each Handle type.
+//
+// resolved_addresses -> ada can only be set for VirtualSubhandle type.
+//
+// for VirtualSubhandle, transaction must be signed by VirtualSubhandle owner.
+// `resolved_addresses` must not change.
+//
+pub fn check_resolved_addresses(
+  handle: Handle,
+  new_resolved_addresses_opt: Option<Pairs<Data, Data>>,
+  old_resolved_addresses_opt: Option<Pairs<Data, Data>>,
+  extra_signatories: List<VerificationKeyHash>,
+) -> Bool {
+  let new_resolved_ada_opt =
+    new_resolved_addresses_opt
+      |> option.map(
+          fn(new_resolved_addresses) -> Option<ByteArray> {
+            get_single_bytearray_value_from_pairs(new_resolved_addresses, "ada")
+          },
+        )
+      |> option.flatten
+
+  let old_resolved_ada_opt =
+    old_resolved_addresses_opt
+      |> option.map(
+          fn(old_resolved_addresses) -> Option<ByteArray> {
+            get_single_bytearray_value_from_pairs(old_resolved_addresses, "ada")
+          },
+        )
+      |> option.flatten
+
+  let resolved_ada_not_set = new_resolved_ada_opt == None
+  let is_valid =
+    when handle is {
+      NFTHandle(_) -> {
+        expect resolved_ada_not_set
+        True
+      }
+      NFTSubhandle(_, _, _) -> {
+        expect resolved_ada_not_set
+        True
+      }
+      VirtualSubhandle(_, _, _) -> {
+        expect Some(old_resolved_ada) = old_resolved_ada_opt
+        let old_ada_address = make_address_from_bytearray(old_resolved_ada)
+
+        // check tx is signed by virtual subhandle owner
+        let is_tx_signed_by_virtual_subhandle_owner =
+          check_tx_is_signed_by_virtual_subhandle_owner(
+            old_ada_address,
+            extra_signatories,
+          )
+        expect is_tx_signed_by_virtual_subhandle_owner
+
+        // `resolved_addresses` must not change
+        let resolved_addresses_stay_same =
+          new_resolved_addresses_opt == old_resolved_addresses_opt
+        expect resolved_addresses_stay_same
+
+        True
+      }
+    }
+  is_valid
+}
+
+fn check_tx_is_signed_by_virtual_subhandle_owner(
+  old_ada_address: Address,
+  extra_signatories: List<VerificationKeyHash>,
+) -> Bool {
+  // check old_ada_address's payment_credential must be VerificationKeyCredential
+  when old_ada_address.payment_credential is {
+    VerificationKeyCredential(old_ada_address_vk_hash) ->
+      list.has(extra_signatories, old_ada_address_vk_hash)
+    _ ->
+      fail @"virtual subhandle owner address must be VerificationKeyCredential"
   }
 }
 

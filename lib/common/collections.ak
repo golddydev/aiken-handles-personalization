@@ -85,3 +85,18 @@ pub fn get_single_list_bytearray_value_from_pairs(
     }
   }
 }
+
+pub fn get_single_pairs_value_from_pairs(
+  data: Pairs<Data, Data>,
+  key: ByteArray,
+) -> Option<Pairs<Data, Data>> {
+  let single_value_opt = get_single_value_from_pairs(data, key)
+  when single_value_opt is {
+    None -> None
+    Some(single_value) -> {
+      trace string.concat(cbor.diagnostic(key), @"as single Pairs<Data, Data>")
+      expect single_value: Pairs<Data, Data> = single_value
+      Some(single_value)
+    }
+  }
+}

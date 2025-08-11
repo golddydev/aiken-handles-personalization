@@ -3,6 +3,7 @@ use common/assets.{AssetClass}
 use common/cip68.{CIP68Datum}
 use common/collections.{
   get_first_int_value_from_pairs, get_single_int_as_bool_value_from_pairs,
+  get_single_pairs_value_from_pairs,
 }
 use common/utils.{check_transaction_is_valid_after_finite_time} as common_utils
 use configs/settings.{PzSettings, find_pz_settings}
@@ -10,7 +11,7 @@ use configs/settings_v1.{PzSettingsV1}
 use handles/utils.{parse_handle_asset_name} as handle_utils
 use validations/pz_governor/personalize.{
   check_fees_are_paid, check_new_extra, check_new_metadata, check_pz_enabled,
-  parse_outputs,
+  check_resolved_addresses, parse_outputs,
 }
 use validations/pz_governor/types.{PzIndexes}
 use validations/pz_governor/utils.{
@@ -117,6 +118,20 @@ pub fn can_personalize(
       reference_inputs,
     )
   expect pz_enabled
+
+  // check resolved ada addresses.
+  let new_resolved_addresses_opt =
+    get_single_pairs_value_from_pairs(new_extra, "resolved_addresses")
+  let old_resolved_addresses_opt =
+    get_single_pairs_value_from_pairs(old_extra, "resolved_addresses")
+  let resolved_addresses_valid =
+    check_resolved_addresses(
+      pz_handle,
+      new_resolved_addresses_opt,
+      old_resolved_addresses_opt,
+      extra_signatories,
+    )
+  expect resolved_addresses_valid
 
   // check fees are paid
   // fees are for designer settings update.
