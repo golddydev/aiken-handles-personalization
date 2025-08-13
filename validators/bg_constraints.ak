@@ -2,6 +2,9 @@ use aiken/transaction.{ScriptContext, WithdrawFrom}
 use common/assets.{AssetClass}
 use validations/bg_constraints/validation.{check_bg_constraints}
 
+type BgConstraintsRedeemer =
+  (AssetClass, Pairs<Data, Data>)
+
 /// NOTE:
 ///
 /// This is a withdrawal validator which checks bg asset's constraints.
@@ -11,13 +14,15 @@ use validations/bg_constraints/validation.{check_bg_constraints}
 /// This validator must be executed with `pz_governor` withdrawal script.
 ///
 validator {
-  fn withdraw(asset_class: AssetClass, ctx: ScriptContext) -> Bool {
+  fn withdraw(redeemer: BgConstraintsRedeemer, ctx: ScriptContext) -> Bool {
     let ScriptContext { purpose, transaction } = ctx
+    let (asset_class, designer_settings) = redeemer
 
     // must be spending validator
     expect WithdrawFrom(_) = purpose
 
-    let bg_constraints_met = check_bg_constraints(asset_class, transaction)
+    let bg_constraints_met =
+      check_bg_constraints(asset_class, transaction, designer_settings)
     expect bg_constraints_met
 
     True

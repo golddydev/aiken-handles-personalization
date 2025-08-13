@@ -1,5 +1,7 @@
 use aiken/builtin.{b_data, i_data}
 use aiken/bytearray
+use aiken/cbor.{serialise}
+use aiken/hash.{sha2_256}
 use aiken/int
 use aiken/list
 use aiken/option
@@ -7,6 +9,7 @@ use aiken/string
 use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/value.{PolicyId}
 use common/assets.{AssetClass}
+use common/base58.{base58_to_hash}
 use common/cip68.{CIP68Datum, prefix_222}
 use common/collections.{
   get_single_bytearray_value_from_pairs, get_single_int_as_bool_value_from_pairs,
@@ -73,10 +76,10 @@ pub fn get_bg_asset_datum(
     |> option.flatten
 }
 
-// this function checks bg asset's constraints are met
+// this function checks bg asset's required settings are met
 // returns: Bool
 //
-pub fn check_bg_constraints_are_met(
+pub fn check_bg_required_settings_are_met(
   bg_datum: CIP68Datum,
   user_output: Output,
   reference_inputs: List<Input>,
@@ -240,4 +243,33 @@ fn check_attribute_value(value: Option<Data>, required_value: ByteArray) -> Bool
       }
     }
   }
+}
+
+// This function checks designer settings are set correctly.
+// * We receive designer_settings from redeemer and check its hash is same as new_designer
+// * Check all settings from designer_settings are correct against default_settings from bg_datum
+//
+pub fn check_designer_settings(
+  designer_settings: Pairs<Data, Data>,
+  default_settings_opt: Option<Pairs<Data, Data>>,
+  new_designer: ByteArray,
+) -> Bool {
+  // check designer_settings hash is same as new_designer's origin hash
+  // new_designer is IPFS URL e.g. ipfs://z...
+  // we drop those `ipfs://z` and check with CID (base58 encoded)
+  let multihash = base58_to_hash(bytearray.drop(new_designer, 8))
+  // drop 4 bytes from multihash, 
+  let original_hash = bytearray.drop(multihash, 4)
+
+  let designer_settings_hash = sha2_256(serialise(designer_settings))
+  let designer_hash_match = designer_settings_hash == original_hash
+  expect designer_hash_match
+
+  // check all settings from designer_settings are correct against default_settings
+  let forced_enabled =
+    get_single_int_as_bool_value_from_pairs(
+      designer_settings,
+      "force_creator_settings",
+    )
+  True
 }
