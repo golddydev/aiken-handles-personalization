@@ -17,7 +17,7 @@ use validations/bg_constraints/utils.{
 pub fn check_bg_constraints(
   asset_class: AssetClass,
   transaction: Transaction,
-  designer_settings: Pairs<Data, Data>,
+  designer_settings: Pairs<ByteArray, Data>,
 ) -> Bool {
   let (policy_id, asset_name) = asset_class
   let Transaction { reference_inputs, outputs, extra_signatories, .. } =
@@ -73,9 +73,10 @@ pub fn check_bg_constraints(
         let default_settings_opt =
           bg_datum_opt
             |> option.map(
-                fn(bg_datum) -> Pairs<Data, Data> {
+                fn(bg_datum) {
                   let CIP68Datum { extra: bg_datum_extra, .. } = bg_datum
-                  expect default_settings: Pairs<Data, Data> = bg_datum_extra
+                  expect default_settings: Pairs<ByteArray, Data> =
+                    bg_datum_extra
                   default_settings
                 },
               )

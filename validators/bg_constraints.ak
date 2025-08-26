@@ -3,7 +3,7 @@ use common/assets.{AssetClass}
 use validations/bg_constraints/validation.{check_bg_constraints}
 
 type BgConstraintsRedeemer =
-  (AssetClass, Pairs<Data, Data>)
+  (AssetClass, Pairs<ByteArray, Data>)
 
 /// NOTE:
 ///
