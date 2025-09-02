@@ -4,15 +4,15 @@ use common/hashes.{ScriptHash, VerificationKeyHash}
 pub type PzSettingsV1 {
   // valid handle policy ids
   policy_ids: List<PolicyId>,
-  // bg_constraints_governor script hash
-  bg_constraints_governor: ScriptHash,
+  // valid personalization script hashes
+  pz_script_hashes: List<ScriptHash>,
   // pz_items_governor script hash
   pz_items_governor: ScriptHash,
+  // bg_constraints_governor script hash
+  bg_constraints_governor: ScriptHash,
   // script hash where 
   // all important assets are locked
   settings_script_hash: ScriptHash,
-  // valid personalization script hashes
-  pz_script_hashes: List<ScriptHash>,
   // personalization provider script hashes
   provider_script_hashes: List<ScriptHash>,
   // treasury script hash

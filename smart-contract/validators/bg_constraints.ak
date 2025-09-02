@@ -2,6 +2,10 @@ use aiken/transaction.{ScriptContext, WithdrawFrom}
 use common/assets.{AssetClass}
 use validations/bg_constraints/validation.{check_bg_constraints}
 
+// asset class and designer settings
+// - asset class: The asset being personalized
+// - designer settings: Personalized designer settings
+// 
 type BgConstraintsRedeemer =
   (AssetClass, Pairs<ByteArray, Data>)
 

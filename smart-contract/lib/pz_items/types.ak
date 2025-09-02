@@ -8,9 +8,9 @@ pub const pz_items_asset_policy_id: PolicyId =
 pub const pz_items_asset_name: AssetName = #"000de140707a5f706f6c6963696573"
 
 pub type PzItems {
-  // approved policy ids for background and pfp
+  // MPT of approved policy ids for background and pfp
   policies: ByteArray,
-  // beta assets ids (for nsfw and trial)
+  // MPT of beta assets ids (for nsfw and trial)
   beta_assets: ByteArray,
 }
 

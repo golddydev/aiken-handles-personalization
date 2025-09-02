@@ -39,7 +39,7 @@ const square_bytearray_for_qr_value: ByteArray = "square,"
 // returns: CIP68Datum (new_datum)
 //
 // NOTE:
-// This function actually checks asset_class is valid,
+// This function actually checks asset_class from redeemer is correct one,
 // since pz_output is validated from `pz_governor` validator.
 //
 pub fn check_pz_output_has_only_asset_class(
