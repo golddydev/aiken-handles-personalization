@@ -11,7 +11,7 @@ use aiken/transaction/credential.{
   Address, Inline, ScriptCredential, StakeCredential,
 }
 use aiken/transaction/value
-use common/assets.{parse_asset_id}
+use common/assets.{AssetClass, parse_asset_id}
 use common/cip68.{
   CIP68Datum, check_asset_name_is_user_asset_or_rft, get_reference_asset_name,
 }
@@ -92,7 +92,7 @@ pub fn find_datum_by_user_asset_id(
   asset_id: ByteArray,
   reference_inputs: List<Input>,
 ) -> Option<CIP68Datum> {
-  let (policy_id, asset_name) = parse_asset_id(asset_id)
+  let AssetClass { policy_id, asset_name } = parse_asset_id(asset_id)
   let (is_asset_name_user_asset_or_rft, is_cip68) =
     check_asset_name_is_user_asset_or_rft(asset_name)
   expect is_asset_name_user_asset_or_rft
@@ -131,7 +131,7 @@ pub fn check_output_has_asset_by_asset_id(
   quantity: Int,
 ) -> Bool {
   let Output { value: v, .. } = output
-  let (policy_id, asset_name) = parse_asset_id(asset_id)
+  let AssetClass { policy_id, asset_name } = parse_asset_id(asset_id)
   let has_asset = value.quantity_of(v, policy_id, asset_name) == quantity
   has_asset
 }

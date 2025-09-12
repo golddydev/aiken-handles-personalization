@@ -39,7 +39,7 @@ pub fn can_personalize(
     extra_signatories,
     ..
   } = transaction
-  let (_, asset_name) = asset_class
+  let AssetClass { asset_name, .. } = asset_class
 
   // transaction starts after valid time
   let transaction_start_time =

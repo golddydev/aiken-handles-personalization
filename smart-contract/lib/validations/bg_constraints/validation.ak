@@ -19,7 +19,7 @@ pub fn check_bg_constraints(
   transaction: Transaction,
   designer_settings: Pairs<ByteArray, Data>,
 ) -> Bool {
-  let (policy_id, asset_name) = asset_class
+  let AssetClass { policy_id, asset_name } = asset_class
   let Transaction { reference_inputs, outputs, extra_signatories, .. } =
     transaction
 

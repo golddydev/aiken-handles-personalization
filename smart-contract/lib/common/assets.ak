@@ -1,8 +1,10 @@
 use aiken/bytearray
 use aiken/transaction/value.{AssetName, PolicyId}
 
-pub type AssetClass =
-  (PolicyId, AssetName)
+pub type AssetClass {
+  policy_id: PolicyId,
+  asset_name: AssetName,
+}
 
 pub fn parse_asset_id(asset_id: ByteArray) -> AssetClass {
   expect bytearray.length(asset_id) > 28
@@ -10,5 +12,5 @@ pub fn parse_asset_id(asset_id: ByteArray) -> AssetClass {
   let policy_id: PolicyId = bytearray.take(asset_id, 28)
   let asset_name: AssetName = bytearray.drop(asset_id, 28)
 
-  (policy_id, asset_name)
+  AssetClass { policy_id, asset_name }
 }

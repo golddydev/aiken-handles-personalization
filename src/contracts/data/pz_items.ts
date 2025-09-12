@@ -1,90 +1,68 @@
-import { TxOutputDatum } from "@helios-lang/ledger";
-import {
-  expectByteArrayData,
-  expectConstrData,
-  makeByteArrayData,
-  makeConstrData,
-  makeIntData,
-  makeListData,
-  UplcData,
-} from "@helios-lang/uplc";
+import { Data, deserializeDatum, mConStr0, mOption } from "@meshsdk/core";
 
 import { invariant } from "../../helpers/index.js";
+import { expectByteString, expectConStr } from "../schemas/index.js";
 import {
   AssetIdPzFlagsProof,
   PolicyIdPzFlagsProof,
   PzAssetProofs,
   PzFlags,
   PzItems,
+  PzItemsPlutusType,
 } from "../types/index.js";
-import { makeOptionData } from "./common.js";
-import { buildMPTProofData } from "./mpt.js";
+import { mMPTProof } from "./mpt.js";
 
-const buildPzItemsData = (pzItems: PzItems): UplcData => {
+export const mPzItems = (pzItems: PzItems): Data => {
   const { policies, beta_assets } = pzItems;
-
-  return makeConstrData(0, [
-    makeByteArrayData(policies),
-    makeByteArrayData(beta_assets),
-  ]);
+  return mConStr0([policies, beta_assets]);
 };
 
-const decodePzItemsDatum = (datum: TxOutputDatum | undefined): PzItems => {
-  invariant(
-    datum?.kind == "InlineTxOutputDatum",
-    "Minting Data Datum must be inline datum"
-  );
-  const datumData = datum.data;
-  const pzItemsConstrData = expectConstrData(datumData, 0, 2);
+export const deserializePzItemsDatum = (
+  datumCbor: string | undefined
+): PzItems => {
+  invariant(!!datumCbor, "Settings must be inline datum");
+  const pzItemsPlutus = deserializeDatum<PzItemsPlutusType>(datumCbor);
+  const pzItemsConstrData = expectConStr(pzItemsPlutus, 0, 2);
 
-  const policies = expectByteArrayData(
+  const policies = expectByteString(
     pzItemsConstrData.fields[0],
-    "policies must be ByteArray"
-  ).toHex();
+    "policies must be ByteString"
+  ).bytes;
 
-  const beta_assets = expectByteArrayData(
+  const beta_assets = expectByteString(
     pzItemsConstrData.fields[1],
-    "beta_assets must be ByteArray"
-  ).toHex();
+    "beta_assets must be ByteString"
+  ).bytes;
 
   return { policies, beta_assets };
 };
 
-const buildPzFlagsData = (pzFlags: PzFlags): UplcData => {
+export const mPzFlags = (pzFlags: PzFlags): Data => {
   const { nsfw, trial } = pzFlags;
-  return makeListData([makeIntData(nsfw), makeIntData(trial)]);
+  return [nsfw, trial];
 };
 
-const buildPolicyIdPzFlagsProofData = (
+export const mPolicyIdPzFlagsProof = (
   policyIdPzFlagsProof: PolicyIdPzFlagsProof
-): UplcData => {
+): Data => {
   const { pzFlags, mptProof } = policyIdPzFlagsProof;
-  return makeListData([buildPzFlagsData(pzFlags), buildMPTProofData(mptProof)]);
+  return [mPzFlags(pzFlags), mMPTProof(mptProof)];
 };
 
-const buildAssetIdPzFlagsProofData = (
+export const mAssetIdPzFlagsProof = (
   assetIdPzFlagsProof: AssetIdPzFlagsProof
-): UplcData => {
+): Data => {
   const { pzFlags, mptProof } = assetIdPzFlagsProof;
-  return makeListData([
-    makeOptionData(pzFlags, buildPzFlagsData),
-    buildMPTProofData(mptProof),
-  ]);
+  return [
+    mOption(pzFlags ? mPzFlags(pzFlags) : undefined),
+    mMPTProof(mptProof),
+  ];
 };
 
-const buildPzAssetProofsData = (pzAssetProofs: PzAssetProofs): UplcData => {
+export const mPzAssetProofs = (pzAssetProofs: PzAssetProofs): Data => {
   const { policyIdPzFlagsProof, assetIdPzFlagsProof } = pzAssetProofs;
-  return makeListData([
-    buildPolicyIdPzFlagsProofData(policyIdPzFlagsProof),
-    buildAssetIdPzFlagsProofData(assetIdPzFlagsProof),
-  ]);
-};
-
-export {
-  buildAssetIdPzFlagsProofData,
-  buildPolicyIdPzFlagsProofData,
-  buildPzAssetProofsData,
-  buildPzFlagsData,
-  buildPzItemsData,
-  decodePzItemsDatum,
+  return [
+    mPolicyIdPzFlagsProof(policyIdPzFlagsProof),
+    mAssetIdPzFlagsProof(assetIdPzFlagsProof),
+  ];
 };

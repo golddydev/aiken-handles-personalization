@@ -3,7 +3,7 @@ use aiken/list
 use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/value
-use common/assets.{parse_asset_id}
+use common/assets.{AssetClass, parse_asset_id}
 use common/mpf.{not_has}
 use pz_items/types.{
   PzAssetProofs, PzFlags, PzItems, pz_items_asset_name, pz_items_asset_policy_id,
@@ -105,7 +105,7 @@ pub fn get_pz_asset_flags(
   beta_assets_mpt: mpt.MerklePatriciaForestry,
   pz_asset_proofs: PzAssetProofs,
 ) -> PzFlags {
-  let (policy_id, _) = parse_asset_id(asset_id)
+  let AssetClass { policy_id, .. } = parse_asset_id(asset_id)
 
   let (policy_id_pz_flags_proof, asset_id_pz_flags_proof) = pz_asset_proofs
   let (policy_id_pz_flags, policy_id_mpt_proof) = policy_id_pz_flags_proof

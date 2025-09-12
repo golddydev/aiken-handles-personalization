@@ -1,23 +1,16 @@
-import { AssetClass } from "@helios-lang/ledger";
-import {
-  makeByteArrayData,
-  makeIntData,
-  makeListData,
-  UplcData,
-} from "@helios-lang/uplc";
+import { Data, mAssetClass } from "@meshsdk/core";
 
 import { DesignerSettings } from "../types/index.js";
-import { buildAssetClassData } from "./common.js";
 
-const buildDesignerSettingsValueData = (
+export const mDesignerSettingsValue = (
   value: string | string[] | number | number[]
-): UplcData => {
+): Data => {
   if (Array.isArray(value)) {
-    return makeListData(value.map(buildDesignerSettingsValueData));
+    return value.map(mDesignerSettingsValue);
   } else if (typeof value === "number") {
-    return makeIntData(value);
+    return value;
   } else if (typeof value === "string") {
-    return makeByteArrayData(value);
+    return value;
   } else {
     throw new Error(
       "Designer Settings value must be string | string[] | number | number[]"
@@ -25,27 +18,17 @@ const buildDesignerSettingsValueData = (
   }
 };
 
-const buildDesignerSettingsData = (
-  designerSettings: DesignerSettings
-): UplcData => {
-  return makeListData(
-    Object.entries(designerSettings).map(([key, value]) =>
-      makeListData([
-        makeByteArrayData(key),
-        buildDesignerSettingsValueData(value),
-      ])
-    )
-  );
-};
-
-const buildBgConstraintsWithdrawRedeemer = (
-  assetClass: AssetClass,
-  designerSettings: DesignerSettings
-): UplcData => {
-  return makeListData([
-    buildAssetClassData(assetClass),
-    buildDesignerSettingsData(designerSettings),
+export const mDesignerSettings = (designerSettings: DesignerSettings): Data =>
+  Object.entries(designerSettings).map(([key, value]) => [
+    key,
+    mDesignerSettingsValue(value),
   ]);
-};
 
-export { buildBgConstraintsWithdrawRedeemer };
+export const mBgConstraintsWithdrawRedeemer = (
+  policy_id: string,
+  asset_name: string,
+  designerSettings: DesignerSettings
+): Data => [
+  mAssetClass(policy_id, asset_name),
+  mDesignerSettings(designerSettings),
+];

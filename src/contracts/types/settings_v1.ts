@@ -1,4 +1,6 @@
-interface SettingsV1 {
+import { ByteString, ConStr0, Integer, List } from "@meshsdk/core";
+
+export interface SettingsV1 {
   // valid handle policy ids
   policy_ids: string[];
   // bg_constraints_governor script hash
@@ -26,4 +28,32 @@ interface SettingsV1 {
   subhandle_share_percent: bigint;
 }
 
-export type { SettingsV1 };
+export type SettingsV1PlutusType = ConStr0<
+  [
+    // valid handle policy ids
+    List<ByteString>,
+    // bg_constraints_governor script hash
+    ByteString,
+    // pz_items_governor script hash
+    ByteString,
+    // script hash where
+    // all important assets are locked
+    ByteString,
+    // valid personalization script hashes
+    List<ByteString>,
+    // personalization provider script hashes
+    List<ByteString>,
+    // treasury script hash
+    ByteString,
+    // admin verification key hashes
+    List<ByteString>,
+    // treasury fee
+    Integer,
+    // pz min fee
+    Integer,
+    // grace period
+    Integer,
+    // subhandle share percent
+    Integer
+  ]
+>;

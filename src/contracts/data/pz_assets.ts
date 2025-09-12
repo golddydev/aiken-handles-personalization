@@ -1,15 +1,12 @@
-import { makeListData, UplcData } from "@helios-lang/uplc";
+import { Data, mOption } from "@meshsdk/core";
 
 import { PzAssetsProofs } from "../types/index.js";
-import { makeOptionData } from "./common.js";
-import { buildPzAssetProofsData } from "./pz_items.js";
+import { mPzAssetProofs } from "./pz_items.js";
 
-const buildPzAssetsProofsData = (pzAssetsProofs: PzAssetsProofs): UplcData => {
+export const mPzAssetsProofs = (pzAssetsProofs: PzAssetsProofs): Data => {
   const { bgAssetProofs, pfpAssetProofs } = pzAssetsProofs;
-  return makeListData([
-    makeOptionData(bgAssetProofs, buildPzAssetProofsData),
-    makeOptionData(pfpAssetProofs, buildPzAssetProofsData),
-  ]);
+  return [
+    mOption(bgAssetProofs ? mPzAssetProofs(bgAssetProofs) : undefined),
+    mOption(pfpAssetProofs ? mPzAssetProofs(pfpAssetProofs) : undefined),
+  ];
 };
-
-export { buildPzAssetsProofsData };

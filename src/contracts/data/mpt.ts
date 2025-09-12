@@ -1,43 +1,18 @@
-import {
-  makeByteArrayData,
-  makeConstrData,
-  makeIntData,
-  makeListData,
-  UplcData,
-} from "@helios-lang/uplc";
+import { Data, mConStr0, mConStr1, mConStr2 } from "@meshsdk/core";
 
 import { MPTProof, MPTProofStep, Neighbor } from "../types/index.js";
 
-const buildMPTProofData = (proof: MPTProof): UplcData => {
-  return makeListData(proof.map(buildMPTProofStepData));
-};
+export const mMPTProof = (proof: MPTProof): Data => proof.map(mMPTProofStep);
 
-const buildMPTProofStepData = (proofStep: MPTProofStep): UplcData => {
+export const mMPTProofStep = (proofStep: MPTProofStep): Data => {
   if (proofStep.type == "branch") {
-    return makeConstrData(0, [
-      makeIntData(proofStep.skip),
-      makeByteArrayData(proofStep.neighbors),
-    ]);
+    return mConStr0([proofStep.skip, proofStep.neighbors]);
   } else if (proofStep.type == "fork") {
-    return makeConstrData(1, [
-      makeIntData(proofStep.skip),
-      buildNeighborData(proofStep.neighbor),
-    ]);
+    return mConStr1([proofStep.skip, mNeighbor(proofStep.neighbor)]);
   } else {
-    return makeConstrData(2, [
-      makeIntData(proofStep.skip),
-      makeByteArrayData(proofStep.key),
-      makeByteArrayData(proofStep.value),
-    ]);
+    return mConStr2([proofStep.skip, proofStep.key, proofStep.value]);
   }
 };
 
-const buildNeighborData = (neighbor: Neighbor): UplcData => {
-  return makeConstrData(0, [
-    makeIntData(neighbor.nibble),
-    makeByteArrayData(neighbor.prefix),
-    makeByteArrayData(neighbor.root),
-  ]);
-};
-
-export { buildMPTProofData, buildMPTProofStepData, buildNeighborData };
+export const mNeighbor = (neighbor: Neighbor): Data =>
+  mConStr0([neighbor.nibble, neighbor.prefix, neighbor.root]);

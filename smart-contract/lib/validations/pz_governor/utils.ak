@@ -42,7 +42,7 @@ pub fn find_pz_utxo(
   let Output { value: pz_utxo_value, datum, .. } = pz_output
 
   // `pz_utxo` must have only one Asset of the given `asset_class` from redeemer.
-  let (policy_id, asset_name) = asset_class
+  let AssetClass { policy_id, asset_name } = asset_class
   let has_only_one_asset =
     value.without_lovelace(pz_utxo_value) == (
       value.zero()

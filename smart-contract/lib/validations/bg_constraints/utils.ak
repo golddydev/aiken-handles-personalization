@@ -47,7 +47,7 @@ pub fn check_pz_output_has_only_asset_class(
   asset_class: AssetClass,
 ) -> CIP68Datum {
   let Output { value: v, datum, .. } = pz_output
-  let (policy_id, asset_name) = asset_class
+  let AssetClass { policy_id, asset_name } = asset_class
 
   let have_only_asset_class =
     value.without_lovelace(v) == (

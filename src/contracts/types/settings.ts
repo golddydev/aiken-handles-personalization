@@ -1,8 +1,19 @@
-import { UplcData } from "@helios-lang/uplc";
+import { ByteString, ConStr0 } from "@meshsdk/core";
 
-interface Settings {
-  pz_governor: string; // withdrawal script hash
-  data: UplcData; // settings v1 data
+import { SettingsV1, SettingsV1PlutusType } from "./settings_v1.js";
+
+export interface Settings {
+  // pz_governor withdrawal script hash
+  pz_governor: string;
+  // settings v1 data
+  data: SettingsV1;
 }
 
-export type { Settings };
+export type SettingsPlutusType = ConStr0<
+  [
+    // pz_governor withdrawal script hash
+    ByteString,
+    // settings v1 data
+    SettingsV1PlutusType
+  ]
+>;
