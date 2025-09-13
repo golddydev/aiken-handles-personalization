@@ -2,7 +2,7 @@ use aiken/merkle_patricia_forestry as mpt
 use aiken/transaction.{Transaction}
 use common/cip68.{CIP68Datum}
 use common/collections.{get_single_int_value_from_pairs}
-use pz_items/utils.{find_pz_items} as pz_items_utils
+use configs/pz_items.{find_pz_items}
 use validations/pz_assets/types.{PzAssetsProofs}
 use validations/pz_assets/utils.{
   check_pz_flags, check_pz_images_and_assets_match, get_pz_datum,

@@ -31,3 +31,7 @@ export enum CONTRACT_NAME {
 
 export const LEGACY_POLICY_ID =
   "f0ff48bbb7bbe9d59a40f1ce90e9e9d0ff5002ec48f232b49ca0fb9a";
+
+// PZ configs
+export const PZ_SETTINGS_HANDLE_NAME = "pz_settings";
+export const PZ_ITEMS_HANDLE_NAME = "pz_items";

@@ -1,13 +1,8 @@
 use aiken/cbor
-use aiken/list
 use aiken/merkle_patricia_forestry as mpt
-use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/value
 use common/assets.{AssetClass, parse_asset_id}
 use common/mpf.{not_has}
-use pz_items/types.{
-  PzAssetProofs, PzFlags, PzItems, pz_items_asset_name, pz_items_asset_policy_id,
-}
+use pz_items/types.{PzAssetProofs, PzFlags}
 
 pub fn default_pz_flags() -> PzFlags {
   (0, 0)
@@ -68,30 +63,6 @@ pub fn combine_policy_id_pz_flags_and_asset_id_pz_flags(
     }
     None -> make_pz_flags(policy_id_nsfw_bool, policy_id_trial_bool)
   }
-}
-
-/// Find PzItems from reference inputs.
-/// input's output value must have `pz_items_asset`.
-///
-pub fn find_pz_items(reference_inputs: List<Input>) -> PzItems {
-  let pz_items_input_opt =
-    list.find(
-      reference_inputs,
-      fn(i) {
-        value.quantity_of(
-          i.output.value,
-          pz_items_asset_policy_id,
-          pz_items_asset_name,
-        ) == 1
-      },
-    )
-  expect Some(pz_items_input) = pz_items_input_opt
-  let Input { output: Output { datum, .. }, .. } = pz_items_input
-
-  // parse PzItems as InlineDatum
-  expect InlineDatum(inline_datum) = datum
-  expect pz_items: PzItems = inline_datum
-  pz_items
 }
 
 /// get Pz Asset's Pz Flags
