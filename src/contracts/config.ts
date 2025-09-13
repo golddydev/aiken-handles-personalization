@@ -1,106 +1,97 @@
 import {
-  makeAddress,
-  makeRegistrationDCert,
-  makeStakingAddress,
-  makeStakingValidatorHash,
-  makeValidatorHash,
-} from "@helios-lang/ledger";
+  resolveScriptHash,
+  serializePlutusScript,
+  serializeRewardAddress,
+} from "@meshsdk/core";
 
+import { getNetworkId } from "../helpers/index.js";
 import {
-  getBgConstraintsWithdrawUplcProgram,
-  getPzAssetsWithdrawUplcProgram,
-  getPzGovernorWithdrawUplcProgram,
-  getPzProxySpendUplcProgram,
+  getBgConstraintsWithdrawScript,
+  getPzAssetsWithdrawScript,
+  getPzGovernorWithdrawScript,
+  getPzProxySpendScript,
 } from "./validators.js";
 
-interface BuildContractsParams {
+export interface BuildScriptsParams {
   isMainnet: boolean;
 }
 
 /**
- * @description Build Contracts for De-Mi from config
- * @param {BuildContractsParams} params
- * @returns All Contracts
+ * @description Build Scripts for Handle's Personalization
+ * @param {BuildScriptsParams} params
+ * @returns All Scripts
  */
-const buildContracts = (params: BuildContractsParams) => {
+export const buildScripts = (params: BuildScriptsParams) => {
   const { isMainnet } = params;
 
   // "pz_proxy.spend"
-  const pzProxySpendUplcProgram = getPzProxySpendUplcProgram();
-  const pzProxySpendValidatorHash = makeValidatorHash(
-    pzProxySpendUplcProgram.hash()
+  const pzProxySpendScript = getPzProxySpendScript();
+  const pzProxySpendScriptHash = resolveScriptHash(
+    pzProxySpendScript.optimized.code,
+    pzProxySpendScript.optimized.version
   );
-  const pzProxySpendValidatorAddress = makeAddress(
-    isMainnet,
-    pzProxySpendValidatorHash
-  );
+  const pzProxySpendScriptAddress = serializePlutusScript(
+    pzProxySpendScript.optimized,
+    undefined,
+    getNetworkId(isMainnet)
+  ).address;
 
   // "pz_governor.withdraw"
-  const pzGovernorWithdrawUplcProgram = getPzGovernorWithdrawUplcProgram();
-  const pzGovernorValidatorHash = makeValidatorHash(
-    pzGovernorWithdrawUplcProgram.hash()
+  const pzGovernorWithdrawScript = getPzGovernorWithdrawScript();
+  const pzGovernorScriptHash = resolveScriptHash(
+    pzGovernorWithdrawScript.optimized.code,
+    pzGovernorWithdrawScript.optimized.version
   );
-  const pzGovernorStakingAddress = makeStakingAddress(
-    isMainnet,
-    makeStakingValidatorHash(pzGovernorWithdrawUplcProgram.hash())
-  );
-  const pzGovernorRegistrationDCert = makeRegistrationDCert(
-    pzGovernorStakingAddress.stakingCredential
+  const pzGovernorRewardAddress = serializeRewardAddress(
+    pzGovernorScriptHash,
+    true,
+    getNetworkId(isMainnet)
   );
 
   // "pz_assets.withdraw"
-  const pzAssetsWithdrawUplcProgram = getPzAssetsWithdrawUplcProgram();
-  const pzAssetsValidatorHash = makeValidatorHash(
-    pzAssetsWithdrawUplcProgram.hash()
+  const pzAssetsWithdrawScript = getPzAssetsWithdrawScript();
+  const pzAssetsScriptHash = resolveScriptHash(
+    pzAssetsWithdrawScript.optimized.code,
+    pzAssetsWithdrawScript.optimized.version
   );
-  const pzAssetsStakingAddress = makeStakingAddress(
-    isMainnet,
-    makeStakingValidatorHash(pzAssetsWithdrawUplcProgram.hash())
-  );
-  const pzAssetsRegistrationDCert = makeRegistrationDCert(
-    pzAssetsStakingAddress.stakingCredential
+  const pzAssetsRewardAddress = serializeRewardAddress(
+    pzAssetsScriptHash,
+    true,
+    getNetworkId(isMainnet)
   );
 
   // "bg_constraints.withdraw"
-  const bgConstraintsWithdrawUplcProgram =
-    getBgConstraintsWithdrawUplcProgram();
-  const bgConstraintsValidatorHash = makeValidatorHash(
-    bgConstraintsWithdrawUplcProgram.hash()
+  const bgConstraintsWithdrawScript = getBgConstraintsWithdrawScript();
+  const bgConstraintsScriptHash = resolveScriptHash(
+    bgConstraintsWithdrawScript.optimized.code,
+    bgConstraintsWithdrawScript.optimized.version
   );
-  const bgConstraintsStakingAddress = makeStakingAddress(
-    isMainnet,
-    makeStakingValidatorHash(bgConstraintsWithdrawUplcProgram.hash())
-  );
-  const bgConstraintsRegistrationDCert = makeRegistrationDCert(
-    bgConstraintsStakingAddress.stakingCredential
+  const bgConstraintsRewardAddress = serializeRewardAddress(
+    bgConstraintsScriptHash,
+    true,
+    getNetworkId(isMainnet)
   );
 
   return {
     pzProxySpend: {
-      pzProxySpendUplcProgram,
-      pzProxySpendValidatorHash,
-      pzProxySpendValidatorAddress,
+      pzProxySpendScript,
+      pzProxySpendScriptHash,
+      pzProxySpendScriptAddress,
     },
     pzGovernor: {
-      pzGovernorWithdrawUplcProgram,
-      pzGovernorValidatorHash,
-      pzGovernorStakingAddress,
-      pzGovernorRegistrationDCert,
+      pzGovernorWithdrawScript,
+      pzGovernorScriptHash,
+      pzGovernorRewardAddress,
     },
     pzAssets: {
-      pzAssetsWithdrawUplcProgram,
-      pzAssetsValidatorHash,
-      pzAssetsStakingAddress,
-      pzAssetsRegistrationDCert,
+      pzAssetsWithdrawScript,
+      pzAssetsScriptHash,
+      pzAssetsRewardAddress,
     },
     bgConstraints: {
-      bgConstraintsWithdrawUplcProgram,
-      bgConstraintsValidatorHash,
-      bgConstraintsStakingAddress,
-      bgConstraintsRegistrationDCert,
+      bgConstraintsWithdrawScript,
+      bgConstraintsScriptHash,
+      bgConstraintsRewardAddress,
     },
   };
 };
-
-export type { BuildContractsParams };
-export { buildContracts };

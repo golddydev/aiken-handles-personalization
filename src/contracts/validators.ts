@@ -1,11 +1,14 @@
-import { decodeUplcProgramV2FromCbor, UplcProgramV2 } from "@helios-lang/uplc";
+import { applyCborEncoding, PlutusScript } from "@meshsdk/core";
 
 import { CONTRACT_NAME } from "../constants/index.js";
 import { invariant } from "../helpers/index.js";
 import optimizedBlueprint from "./optimized-blueprint.js";
 import unOptimizedBlueprint from "./unoptimized-blueprint.js";
 
-const getPzProxySpendUplcProgram = (): UplcProgramV2 => {
+export const getPzProxySpendScript = (): {
+  optimized: PlutusScript;
+  unoptimized: PlutusScript;
+} => {
   const optimizedFoundValidator = optimizedBlueprint.validators.find(
     (validator) => validator.title == CONTRACT_NAME.PZ_PROXY_SPEND
   );
@@ -16,14 +19,22 @@ const getPzProxySpendUplcProgram = (): UplcProgramV2 => {
     !!optimizedFoundValidator && !!unOptimizedFoundValidator,
     "Pz Proxy Spend Validator not found"
   );
-  return decodeUplcProgramV2FromCbor(
-    optimizedFoundValidator.compiledCode
-  ).withAlt(
-    decodeUplcProgramV2FromCbor(unOptimizedFoundValidator.compiledCode)
-  );
+  return {
+    optimized: {
+      code: applyCborEncoding(optimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+    unoptimized: {
+      code: applyCborEncoding(unOptimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+  };
 };
 
-const getPzGovernorWithdrawUplcProgram = (): UplcProgramV2 => {
+export const getPzGovernorWithdrawScript = (): {
+  optimized: PlutusScript;
+  unoptimized: PlutusScript;
+} => {
   const optimizedFoundValidator = optimizedBlueprint.validators.find(
     (validator) => validator.title == CONTRACT_NAME.PZ_GOVERNOR_WITHDRAW
   );
@@ -34,14 +45,22 @@ const getPzGovernorWithdrawUplcProgram = (): UplcProgramV2 => {
     !!optimizedFoundValidator && unOptimizedFoundValidator,
     "Pz Governor Withdrawal Validator not found"
   );
-  return decodeUplcProgramV2FromCbor(
-    optimizedFoundValidator.compiledCode
-  ).withAlt(
-    decodeUplcProgramV2FromCbor(unOptimizedFoundValidator.compiledCode)
-  );
+  return {
+    optimized: {
+      code: applyCborEncoding(optimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+    unoptimized: {
+      code: applyCborEncoding(unOptimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+  };
 };
 
-const getPzAssetsWithdrawUplcProgram = (): UplcProgramV2 => {
+export const getPzAssetsWithdrawScript = (): {
+  optimized: PlutusScript;
+  unoptimized: PlutusScript;
+} => {
   const optimizedFoundValidator = optimizedBlueprint.validators.find(
     (validator) => validator.title == CONTRACT_NAME.PZ_ASSETS_WITHDRAW
   );
@@ -52,14 +71,22 @@ const getPzAssetsWithdrawUplcProgram = (): UplcProgramV2 => {
     !!optimizedFoundValidator && !!unOptimizedFoundValidator,
     "Pz Assets Withdrawal Validator not found"
   );
-  return decodeUplcProgramV2FromCbor(
-    optimizedFoundValidator.compiledCode
-  ).withAlt(
-    decodeUplcProgramV2FromCbor(unOptimizedFoundValidator.compiledCode)
-  );
+  return {
+    optimized: {
+      code: applyCborEncoding(optimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+    unoptimized: {
+      code: applyCborEncoding(unOptimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+  };
 };
 
-const getBgConstraintsWithdrawUplcProgram = (): UplcProgramV2 => {
+export const getBgConstraintsWithdrawScript = (): {
+  optimized: PlutusScript;
+  unoptimized: PlutusScript;
+} => {
   const optimizedFoundValidator = optimizedBlueprint.validators.find(
     (validator) => validator.title == CONTRACT_NAME.BG_CONSTRAINTS_WITHDRAW
   );
@@ -70,16 +97,14 @@ const getBgConstraintsWithdrawUplcProgram = (): UplcProgramV2 => {
     !!optimizedFoundValidator && !!unOptimizedFoundValidator,
     "Bg Constraints Withdrawal Validator not found"
   );
-  return decodeUplcProgramV2FromCbor(
-    optimizedFoundValidator.compiledCode
-  ).withAlt(
-    decodeUplcProgramV2FromCbor(unOptimizedFoundValidator.compiledCode)
-  );
-};
-
-export {
-  getBgConstraintsWithdrawUplcProgram,
-  getPzAssetsWithdrawUplcProgram,
-  getPzGovernorWithdrawUplcProgram,
-  getPzProxySpendUplcProgram,
+  return {
+    optimized: {
+      code: applyCborEncoding(optimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+    unoptimized: {
+      code: applyCborEncoding(unOptimizedFoundValidator.compiledCode),
+      version: "V2",
+    },
+  };
 };
